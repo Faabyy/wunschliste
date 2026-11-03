@@ -1,0 +1,131 @@
+// Wunschliste – kleine Verbesserungen. Ohne JS funktioniert alles über normale Formulare.
+(() => {
+  'use strict';
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const nativeSubmit = HTMLFormElement.prototype.submit;
+
+  // Formulare mit data-swap: im Hintergrund absenden und nur den betroffenen Teil austauschen.
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const question = form.dataset.confirm;
+    if (question && !window.confirm(question)) {
+      event.preventDefault();
+      return;
+    }
+
+    const targetId = form.dataset.swap;
+    if (!targetId || !window.fetch || !window.DOMParser) {
+      markBusy(event.submitter);
+      return;
+    }
+
+    event.preventDefault();
+    if (form.classList.contains('is-busy')) return;
+    form.classList.add('is-busy');
+
+    let response;
+    try {
+      response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+      });
+    } catch (e) {
+      form.classList.remove('is-busy');
+      nativeSubmit.call(form);
+      return;
+    }
+
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const fresh = doc.getElementById(targetId);
+    const old = document.getElementById(targetId);
+    if (!response.ok || !fresh || !old) {
+      // Der Server hat geantwortet, nur passt die Seite nicht: dorthin wechseln statt erneut senden.
+      window.location.assign(response.url || window.location.href);
+      return;
+    }
+
+    const before = positions(old);
+    const changed = form.closest('[data-id]');
+    old.replaceWith(fresh);
+    swapFlashes(doc);
+    animate(fresh, before, changed && changed.dataset.id);
+
+    const focusTarget = changed && fresh.querySelector(`[data-id="${changed.dataset.id}"] [data-focus], [data-id="${changed.dataset.id}"] button:not(:disabled)`);
+    const selfFocus = fresh.matches('[data-id]') && fresh.querySelector('[data-focus], button:not(:disabled)');
+    const next = selfFocus || focusTarget;
+    if (next && document.activeElement === document.body) next.focus({ preventScroll: true });
+  });
+
+  function markBusy(button) {
+    if (!button || !button.dataset.busy) return;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = button.dataset.busy;
+    // Erst nach dem Absenden sperren, sonst geht der Klick verloren.
+    setTimeout(() => { button.disabled = true; }, 0);
+  }
+
+  function positions(root) {
+    const map = new Map();
+    const nodes = root.matches('[data-id]') ? [root] : root.querySelectorAll('[data-id]');
+    nodes.forEach((el) => map.set(el.dataset.id, el.getBoundingClientRect().top));
+    return map;
+  }
+
+  function animate(root, before, changedId) {
+    if (reduceMotion) return;
+    const nodes = root.matches('[data-id]') ? [root] : root.querySelectorAll('[data-id]');
+    nodes.forEach((el) => {
+      const id = el.dataset.id;
+      if (id === changedId) {
+        el.classList.add('is-fresh');
+        el.addEventListener('animationend', () => el.classList.remove('is-fresh'), { once: true });
+      }
+      if (!before.has(id)) return;
+      const dy = before.get(id) - el.getBoundingClientRect().top;
+      if (Math.abs(dy) < 1) return;
+      el.animate(
+        [{ transform: `translateY(${dy}px)` }, { transform: 'none' }],
+        { duration: 320, easing: 'cubic-bezier(.2,.7,.2,1)' },
+      );
+    });
+  }
+
+  function swapFlashes(doc) {
+    const fresh = doc.getElementById('flashes');
+    const old = document.getElementById('flashes');
+    if (fresh && old) {
+      old.replaceWith(fresh);
+      fadeFlashes();
+    }
+  }
+
+  // Erfolgsmeldungen verschwinden nach ein paar Sekunden von selbst.
+  function fadeFlashes() {
+    document.querySelectorAll('.flash-success').forEach((el) => {
+      setTimeout(() => {
+        el.classList.add('is-leaving');
+        el.addEventListener('transitionend', () => el.remove(), { once: true });
+        setTimeout(() => el.remove(), 800);
+      }, 4000);
+    });
+  }
+
+  fadeFlashes();
+
+  // Nach dem Hinzufügen das Formular wieder zuklappen lassen, aber Fokus aufs Titelfeld beim Öffnen.
+  const adder = document.querySelector('.adder');
+  if (adder) {
+    adder.addEventListener('toggle', () => {
+      if (adder.open) {
+        const title = adder.querySelector('input[name="titel"]');
+        if (title) title.focus({ preventScroll: true });
+      }
+    });
+  }
+})();

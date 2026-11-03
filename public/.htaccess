@@ -1,0 +1,4 @@
+# Für Apache ohne eigene VirtualHost-Konfiguration (z. B. Webspace).
+# Im Docker-Image steht dasselbe in docker/apache.conf.
+Options -Indexes
+FallbackResource /index.php
