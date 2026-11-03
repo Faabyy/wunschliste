@@ -112,11 +112,13 @@ function view(string $name, array $vars = []): string
 function page(string $name, array $vars, string $title, string $active = ''): never
 {
     $content = view($name, $vars);
+    $user = Auth::user();
     echo view('layout', [
         'content' => $content,
         'title' => $title,
         'active' => $active,
-        'user' => Auth::user(),
+        'user' => $user,
+        'otherLists' => $user === null ? 0 : count(Wishlist::others((int) $user['id'])),
         'flashes' => take_flashes(),
     ]);
     exit;

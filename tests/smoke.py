@@ -94,6 +94,8 @@ def main():
         run(base, env)
         if webspace:
             run_webspace(base)
+        else:
+            run_single(env)
     finally:
         server.terminate()
         err = server.stderr.read().decode()
@@ -102,6 +104,51 @@ def main():
             print("PHP-Meldungen im Serverlog:\n" + "\n".join(bad))
             sys.exit(1)
     print("\nAlle Kernfälle OK.")
+
+
+def run_single(env):
+    """Nur ein Beschenkter: keine anderen Listen bei ihm, Schenkende landen direkt auf seiner Liste."""
+    print("Nur ein Beschenkter")
+    env = dict(env, WUNSCHLISTE_DATA=tempfile.mkdtemp(prefix="wunschliste-single-"))
+    port = free_port()
+    server = subprocess.Popen(["php", "-S", f"127.0.0.1:{port}", "-t", os.path.join(ROOT, "public")],
+                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(0.6)
+        base = f"http://127.0.0.1:{port}"
+        konten(env, "anlegen", "Lena", "beschenkt")
+        konten(env, "anlegen", "Oma")
+        konten(env, "anlegen", "Opa")
+        lena = login(base, "Lena")
+        lena.post("/eintrag", {"titel": "Puppenhaus", "link": "", "notiz": "", "preis": ""})
+        s, html, _ = lena.get("/")
+        check("Puppenhaus" in html and "Andere Listen" not in html and 'class="col-others"' not in html,
+              "Beschenkte sieht keinen Abschnitt „Andere Listen“")
+        check('class="tabbar"' not in html and "Was ich schenke" not in html, "Keine Tableiste und kein „Was ich schenke“")
+        check("<h1 id=\"h-own\">Meine Wunschliste</h1>" in lena.get("/listen")[1], "/listen führt zurück zur eigenen Liste")
+
+        oma = login(base, "Oma")
+        s, html, _ = oma.get("/")
+        check("Wünsche von Lena" in html and "Puppenhaus" in html, "Schenkende landen direkt auf Lenas Liste")
+        check("Alle Listen" not in html, "Kein Link zurück zu „Alle Listen“")
+        check(">Wunschliste<" in html and "Was ich schenke" in html, "Menü: Wunschliste und Was ich schenke")
+        item = int(re.search(r'/eintrag/(\d+)/reservieren', html).group(1))
+        check('name="zurueck" value="/"' in html, "Reservieren springt zurück auf die Startseite")
+        s, html, h = oma.post(f"/eintrag/{item}/reservieren", {"zurueck": "/"}, follow=False)
+        check(h.get("Location", "").startswith("/#e"), "Weiterleitung nach dem Reservieren auf /")
+        s, html, _ = oma.get("/")
+        check("Du schenkst das" in html, "Reservierung auf der Startseite sichtbar")
+        check("Oma schenkt das" in login(base, "Opa").get("/")[1], "Opa sieht Omas Reservierung")
+        check("<h1>Wünsche von Lena</h1>" in oma.get("/listen")[1], "/listen führt direkt zu Lenas Liste")
+        s, html, _ = lena.get("/")
+        check("Oma" not in html.split('<main')[1] and "Puppenhaus" in html, "Lena merkt nichts von der Reservierung")
+
+        konten(env, "anlegen", "Max", "beschenkt")
+        check("Andere Listen" in lena.get("/")[1], "Mit zweitem Beschenkten erscheint „Andere Listen“ wieder")
+        check("Wunschlisten" in oma.get("/")[1] and "Wünsche von Lena" not in oma.get("/")[1],
+              "Mit zwei Beschenkten wieder die Übersicht für Schenkende")
+    finally:
+        server.terminate()
 
 
 def run_webspace(base):
@@ -309,7 +356,7 @@ def run(base, env):
     check("Fahrradlampe" not in fabian.get("/schenken")[1], "Reservierung auf ausgeblendeter Liste ausgeblendet")
     s, html, _ = fabian.post(f"/eintrag/{jitem}/freigeben", {"zurueck": "/schenken"})
     check("gibt es nicht mehr" in html, "Ausgeblendeter Wunsch lässt sich nicht bearbeiten")
-    check("Wunschlisten" in juergen.get("/")[1], "Jürgen sieht jetzt die Schenker-Startseite")
+    check("Wünsche von Fabian" in juergen.get("/")[1], "Jürgen landet als Schenker direkt bei Fabian (einziger Beschenkter)")
     s, html, _ = juergen.get(f"/eintrag/{jitem}")
     check("keine eigene Wunschliste" in html, "Jürgen kann seine ausgeblendeten Wünsche nicht bearbeiten")
     s, html, _ = admin.get("/verwaltung")

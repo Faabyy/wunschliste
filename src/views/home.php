@@ -1,6 +1,6 @@
 <?php /** @var array $user @var array $items @var array $people @var array $notices @var array $old */ ?>
 <?= view('partials/notices', ['notices' => $notices, 'back' => '/']) ?>
-<div class="home-grid">
+<div class="home-grid<?= $people ? '' : ' home-single' ?>">
   <section class="col-own" aria-labelledby="h-own">
     <header class="section-head">
       <h1 id="h-own">Meine Wunschliste</h1>
@@ -20,8 +20,10 @@
     <?= view('partials/own_list', ['items' => $items]) ?>
   </section>
 
-  <aside class="col-others" aria-labelledby="h-others">
-    <h2 id="h-others" class="aside-title">Andere Listen</h2>
-    <?= view('partials/people', ['people' => $people]) ?>
-  </aside>
+  <?php if ($people): ?>
+    <aside class="col-others" aria-labelledby="h-others">
+      <h2 id="h-others" class="aside-title">Andere Listen</h2>
+      <?= view('partials/people', ['people' => $people]) ?>
+    </aside>
+  <?php endif; ?>
 </div>

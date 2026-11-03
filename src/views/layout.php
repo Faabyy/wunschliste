@@ -1,6 +1,25 @@
 <?php
-/** @var string $content @var string $title @var string $active @var ?array $user @var array $flashes */
+/** @var string $content @var string $title @var string $active @var ?array $user @var int $otherLists @var array $flashes */
 $current = static fn(string $key): string => $active === $key ? ' aria-current="page"' : '';
+
+// Menüpunkte: [Ziel, aktiv-Schlüssel, Text oben, Text Tableiste, Icon]. Nur, was es gerade gibt.
+$nav = [];
+if ($user) {
+    if ($user['can_wish']) {
+        $nav[] = ['/', 'home', 'Meine Liste', 'Meine Liste', 'list'];
+        if ($otherLists > 0) {
+            $nav[] = ['/listen', 'people', 'Andere Listen', 'Andere', 'users'];
+        }
+    } elseif ($otherLists === 1) {
+        $nav[] = ['/', 'people', 'Wunschliste', 'Wunschliste', 'list'];
+    } else {
+        $nav[] = ['/', 'people', 'Wunschlisten', 'Wunschlisten', 'users'];
+    }
+    if ($otherLists > 0) {
+        $nav[] = ['/schenken', 'gifts', 'Was ich schenke', 'Ich schenke', 'gift'];
+    }
+}
+$tabbar = count($nav) > 1;
 ?>
 <!doctype html>
 <html lang="de">
@@ -16,21 +35,19 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
 <link rel="stylesheet" href="<?= e(asset('app.css')) ?>">
 <script src="<?= e(asset('app.js')) ?>" defer></script>
 </head>
-<body class="<?= $user ? 'has-user' : 'no-user' ?>">
+<body class="<?= $tabbar ? 'has-tabbar' : 'no-tabbar' ?>">
 <a class="skip" href="#main">Zum Inhalt springen</a>
 <header class="topbar">
   <div class="wrap topbar-inner">
     <a class="brand" href="<?= e(base_path()) ?>/"><?= icon('gift', 'brand-mark') ?><span>Wunschliste</span></a>
     <?php if ($user): ?>
-      <nav class="mainnav" aria-label="Hauptmenü">
-        <?php if ($user['can_wish']): ?>
-          <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>>Meine Liste</a>
-          <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>>Andere Listen</a>
-        <?php else: ?>
-          <a href="<?= e(base_path()) ?>/"<?= $current('people') ?>>Wunschlisten</a>
-        <?php endif; ?>
-        <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>>Was ich schenke</a>
-      </nav>
+      <?php if ($tabbar): ?>
+        <nav class="mainnav" aria-label="Hauptmenü">
+          <?php foreach ($nav as [$path, $key, $label]): ?>
+            <a href="<?= e(url($path)) ?>"<?= $current($key) ?>><?= e($label) ?></a>
+          <?php endforeach; ?>
+        </nav>
+      <?php endif; ?>
       <form class="account" method="post" action="<?= e(base_path()) ?>/abmelden">
         <?= Csrf::field() ?>
         <span class="account-name"><?= avatar($user['name'], 'avatar-sm') ?><span><?= e($user['name']) ?></span></span>
@@ -49,15 +66,11 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
   <?= $content ?>
 </main>
 
-<?php if ($user): ?>
+<?php if ($tabbar): ?>
 <nav class="tabbar" aria-label="Hauptmenü">
-  <?php if ($user['can_wish']): ?>
-    <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>><?= icon('list') ?><span>Meine Liste</span></a>
-    <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>><?= icon('users') ?><span>Andere</span></a>
-  <?php else: ?>
-    <a href="<?= e(base_path()) ?>/"<?= $current('people') ?>><?= icon('users') ?><span>Wunschlisten</span></a>
-  <?php endif; ?>
-  <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>><?= icon('gift') ?><span>Ich schenke</span></a>
+  <?php foreach ($nav as [$path, $key, , $label, $icon]): ?>
+    <a href="<?= e(url($path)) ?>"<?= $current($key) ?>><?= icon($icon) ?><span><?= e($label) ?></span></a>
+  <?php endforeach; ?>
 </nav>
 <?php endif; ?>
 </body>

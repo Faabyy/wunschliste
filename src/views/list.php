@@ -1,8 +1,10 @@
-<?php /** @var array $owner @var array $items @var int $viewerId */
+<?php /** @var array $owner @var array $items @var int $viewerId @var bool $single @var string $back @var array $notices */
 $free = count(array_filter($items, static fn(array $it): bool => $it['giver_id'] === null));
-$back = '/liste/' . (int) $owner['id'];
 ?>
-<a class="back" href="<?= e(base_path()) ?>/listen"><?= icon('back') ?><span>Alle Listen</span></a>
+<?= view('partials/notices', ['notices' => $notices, 'back' => $back]) ?>
+<?php if (!$single): ?>
+  <a class="back" href="<?= e(base_path()) ?>/listen"><?= icon('back') ?><span>Alle Listen</span></a>
+<?php endif; ?>
 <header class="section-head list-head">
   <?= avatar($owner['name'], 'avatar-lg') ?>
   <div>

@@ -24,6 +24,9 @@ kein Build-Schritt, keine externen Schriften oder CDNs.
   (keine eigene Liste, sieht direkt die Wunschlisten der Beschenkten). Neue Konten schenken
   standardmäßig nur. Wechselt ein beschenktes Konto auf „schenkt nur“, bleiben seine Wünsche und
   Reservierungen gespeichert, sind aber für alle ausgeblendet, bis du es zurückstellst.
+- **Nur ein Beschenkter** (z. B. ein Kind): Bei ihm entfallen „Andere Listen“ und „Was ich schenke“,
+  Schenkende landen nach dem Login direkt auf seiner Liste. Kommt ein zweiter Beschenkter dazu,
+  erscheinen Übersicht und Abschnitt automatisch wieder.
 - **Eigene Liste**: Wünsche mit Titel, Link (nur http/https, Anzeige als Domain), Notiz und Preis
   anlegen, bearbeiten, löschen und sortieren.
 - **Preis aus dem Link**: Ohne Preisangabe liest die Seite den Preis aus den Produktdaten des Shops

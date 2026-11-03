@@ -122,8 +122,13 @@ function route_home(): void
     }
     $uid = (int) $user['id'];
     if (!$user['can_wish']) {
+        $people = Wishlist::others($uid);
+        if (count($people) === 1) {
+            // Nur ein Beschenkter: dessen Liste ist gleich die Startseite.
+            show_list(Wishlist::userById((int) $people[0]['id']), $user, true);
+        }
         page('giver_home', [
-            'people' => Wishlist::others($uid),
+            'people' => $people,
             'notices' => Wishlist::notices($uid),
         ], 'Wunschlisten', 'people');
     }
@@ -181,7 +186,25 @@ function route_logout(): void
 function route_people(): void
 {
     $user = require_user();
-    page('people', ['people' => Wishlist::others((int) $user['id'])], 'Andere Listen', 'people');
+    $people = Wishlist::others((int) $user['id']);
+    if ($people === [] || (count($people) === 1 && !$user['can_wish'])) {
+        redirect('/');
+    }
+    page('people', ['people' => $people], 'Andere Listen', 'people');
+}
+
+/** Fremde Liste anzeigen; $asHome = als Startseite eines Schenkenden, wenn es nur diese gibt. */
+function show_list(array $owner, array $user, bool $asHome): never
+{
+    $viewerId = (int) $user['id'];
+    page('list', [
+        'owner' => $owner,
+        'items' => Wishlist::itemsFor((int) $owner['id'], $viewerId),
+        'viewerId' => $viewerId,
+        'single' => !$user['can_wish'] && count(Wishlist::others($viewerId)) === 1,
+        'back' => $asHome ? '/' : '/liste/' . (int) $owner['id'],
+        'notices' => $asHome ? Wishlist::notices($viewerId) : [],
+    ], 'Wünsche von ' . $owner['name'], 'people');
 }
 
 function route_list(string $id): void
@@ -196,11 +219,7 @@ function route_list(string $id): void
     if ($owner === null || !$owner['can_wish']) {
         abort(404, 'Diese Liste gibt es nicht.');
     }
-    page('list', [
-        'owner' => $owner,
-        'items' => Wishlist::itemsFor($ownerId, (int) $user['id']),
-        'viewerId' => (int) $user['id'],
-    ], 'Wünsche von ' . $owner['name'], 'people');
+    show_list($owner, $user, false);
 }
 
 function route_gifts(): void
