@@ -12,7 +12,8 @@ require __DIR__ . '/Throttle.php';
 require __DIR__ . '/Auth.php';
 require __DIR__ . '/Csrf.php';
 require __DIR__ . '/Wishlist.php';
-require __DIR__ . '/PriceFetcher.php';
+require __DIR__ . '/LinkFetcher.php';
+require __DIR__ . '/Images.php';
 
 /** Fehler, deren Meldung dem Nutzer gezeigt werden darf. */
 final class UserError extends RuntimeException
@@ -47,7 +48,7 @@ function start_session(): void
 
 function send_security_headers(): void
 {
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; "
         . "form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'");
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');

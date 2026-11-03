@@ -46,6 +46,7 @@ $routes = [
     ['POST', '#^/eintrag/(\d+)/freigeben$#',            'route_release'],
     ['POST', '#^/eintrag/(\d+)/gekauft$#',              'route_purchased'],
     ['POST', '#^/hinweis/(\d+)/ok$#',                   'route_notice_dismiss'],
+    ['GET',  '#^/bild/([a-f0-9]{32})$#',                'route_image'],
     ['GET',  '#^/verwaltung$#',                         'route_admin'],
     ['POST', '#^/verwaltung/anmelden$#',                'route_admin_login'],
     ['POST', '#^/verwaltung/abmelden$#',                'route_admin_logout'],

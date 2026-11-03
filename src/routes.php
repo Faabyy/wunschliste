@@ -95,16 +95,33 @@ function raw_item_input(): array
     return ['titel' => $get('titel'), 'link' => $get('link'), 'notiz' => $get('notiz'), 'preis' => $get('preis')];
 }
 
-/** Holt den Preis aus dem Link, wenn keiner von Hand eingetragen ist. */
-function fill_price(int $itemId, array $data): void
+/**
+ * Liest Preis und Bild aus dem Link, soweit gewünscht und nicht von Hand gesetzt.
+ * Sperrt der Shop automatische Abrufe (Amazon, eBay), gibt es einen Hinweis.
+ */
+function enrich_from_link(int $itemId, array $data, bool $wantPrice, bool $wantImage): void
 {
-    if ($data['price_manual'] || $data['url'] === null || !Config::priceFetch()) {
+    if ($data['url'] === null || !Config::priceFetch() || (!$wantPrice && !$wantImage)) {
         return;
     }
     try {
-        Wishlist::setPrice($itemId, PriceFetcher::fetch($data['url']));
+        $info = LinkFetcher::inspect($data['url']);
+        if ($wantPrice) {
+            Wishlist::setPrice($itemId, $info['price']);
+        }
+        $image = null;
+        if ($wantImage && $info['image'] !== null && ($image = Images::fromUrl($info['image'])) !== null) {
+            Wishlist::setImage($itemId, $image, false);
+        }
     } catch (Throwable $e) {
-        error_log('Preisabruf fehlgeschlagen: ' . $e->getMessage());
+        error_log('Abruf des Links fehlgeschlagen: ' . $e->getMessage());
+        return;
+    }
+    $missingPrice = $wantPrice && $info['price'] === null;
+    if ($info['shop'] === 'amazon' && $missingPrice) {
+        flash('info', 'Amazon gibt Preise nicht automatisch heraus. Trag den Preis bei Bedarf von Hand ein.');
+    } elseif ($info['shop'] === 'ebay') {
+        flash('info', 'eBay gibt Preis und Bild nicht automatisch heraus. Trag den Preis von Hand ein und lade bei Bedarf ein Bild hoch.');
     }
 }
 
@@ -243,9 +260,19 @@ function route_item_create(): void
         remember_input(raw_item_input() + ['open' => true]);
         redirect('/#neu');
     }
+    try {
+        $upload = Images::fromUpload($_FILES['bild'] ?? null);
+    } catch (UserError $e) {
+        flash('error', $e->getMessage());
+        remember_input(raw_item_input() + ['open' => true]);
+        redirect('/#neu');
+    }
     $id = Wishlist::addItem((int) $user['id'], $data);
-    fill_price($id, $data);
+    if ($upload !== null) {
+        Wishlist::setImage($id, $upload, true);
+    }
     flash('success', 'Wunsch hinzugefügt.');
+    enrich_from_link($id, $data, !$data['price_manual'], $upload === null);
     redirect('/#e' . $id);
 }
 
@@ -275,21 +302,53 @@ function route_item_update(string $id): void
         remember_input(raw_item_input());
         redirect('/eintrag/' . $item['id']);
     }
-    $refetch = !$data['price_manual'] && $data['url'] !== null
-        && ($data['url'] !== $item['url'] || $item['price_manual'] || $item['price_cents'] === null || isset($_POST['preis_neu']));
-    if (!$data['price_manual'] && !$refetch && $data['url'] !== null) {
+    try {
+        $upload = Images::fromUpload($_FILES['bild'] ?? null);
+    } catch (UserError $e) {
+        flash('error', $e->getMessage());
+        remember_input(raw_item_input());
+        redirect('/eintrag/' . $item['id']);
+    }
+    $itemId = (int) $item['id'];
+    $refresh = isset($_POST['neu_lesen']);
+    $urlChanged = $data['url'] !== $item['url'];
+    $wantPrice = !$data['price_manual'] && $data['url'] !== null
+        && ($urlChanged || $refresh || $item['price_manual'] || $item['price_cents'] === null);
+    if (!$data['price_manual'] && !$wantPrice && $data['url'] !== null) {
         // Automatisch gelesenen Preis behalten.
         $data['price_cents'] = $item['price_cents'];
         $data['price_currency'] = $item['price_currency'];
     }
-    if (!attempt(fn() => Wishlist::updateItem($uid, (int) $item['id'], $data))) {
-        redirect('/eintrag/' . $item['id']);
+    if (!attempt(fn() => Wishlist::updateItem($uid, $itemId, $data))) {
+        Images::delete($upload);
+        redirect('/eintrag/' . $itemId);
     }
-    if ($refetch) {
-        fill_price((int) $item['id'], $data);
+
+    // Bild: hochgeladen > entfernt > aus dem Link (wenn nicht von Hand gesetzt).
+    $imageManual = (bool) $item['image_manual'];
+    if ($upload !== null) {
+        Wishlist::setImage($itemId, $upload, true);
+        $imageManual = true;
+    } elseif (isset($_POST['bild_entfernen'])) {
+        Wishlist::setImage($itemId, null, true);
+        $imageManual = true;
+    } elseif ($refresh) {
+        $imageManual = false;
     }
+    if (!$imageManual && $data['url'] === null && $item['image'] !== null) {
+        Wishlist::setImage($itemId, null, false);
+    }
+    $wantImage = !$imageManual && $data['url'] !== null && ($urlChanged || $refresh || $item['image'] === null);
+
     flash('success', 'Gespeichert.');
-    redirect('/#e' . $item['id']);
+    enrich_from_link($itemId, $data, $wantPrice, $wantImage);
+    redirect('/#e' . $itemId);
+}
+
+function route_image(string $id): void
+{
+    require_user();
+    Images::send($id);
 }
 
 function route_item_delete(string $id): void
@@ -358,8 +417,8 @@ function server_checks(): array
         ['config.php', Config::hasFile() ? 'ok' : 'warn', Config::hasFile() ? 'vorhanden' : 'fehlt, Einstellungen kommen nur aus Umgebungsvariablen'],
         ['Zugangscode', Config::accessCode() !== '' ? 'ok' : 'warn', Config::accessCode() !== '' ? 'gesetzt' : 'nicht gesetzt: jeder, der die Adresse kennt, kommt rein'],
         ['HTTPS', request_is_https() ? 'ok' : 'warn', request_is_https() ? 'aktiv' : 'diese Seite wurde ohne HTTPS geladen'],
-        ['Preise aus Links', !Config::priceFetch() ? 'warn' : (PriceFetcher::available() ? 'ok' : 'warn'),
-            !Config::priceFetch() ? 'ausgeschaltet' : (PriceFetcher::available() ? 'möglich' : 'der Server erlaubt keine Verbindungen nach außen')],
+        ['Preise aus Links', !Config::priceFetch() ? 'warn' : (LinkFetcher::available() ? 'ok' : 'warn'),
+            !Config::priceFetch() ? 'ausgeschaltet' : (LinkFetcher::available() ? 'möglich' : 'der Server erlaubt keine Verbindungen nach außen')],
         ['Unterordner', 'ok', base_path() === '' ? 'keiner (eigene Domain)' : base_path()],
     ];
     return $checks;

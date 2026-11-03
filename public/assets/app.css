@@ -141,6 +141,7 @@ code { font-size: .9em; background: var(--surface-2); padding: .1em .35em; borde
 }
 .flash-success { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
 .flash-error { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.flash-info { background: var(--surface); color: var(--ink-2); border-color: var(--line-strong); }
 .flash.is-leaving { opacity: 0; transform: translateY(-4px); transition: opacity .4s, transform .4s; }
 
 .notices { display: grid; gap: 8px; margin-bottom: 18px; }
@@ -541,3 +542,49 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
 }
 .status-badge .i { width: 15px; height: 15px; }
 .status-wish { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+/* ---------- Bilder ---------- */
+
+.card-body { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+.card-text { flex: 1; min-width: 0; }
+.card-thumb {
+  flex: none; display: grid; place-items: center; overflow: hidden;
+  width: 76px; height: 76px; border-radius: 12px;
+  background: #fff; border: 1px solid var(--line);
+}
+.card-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.card-thumb.is-empty { background: var(--surface-2); color: var(--line-strong); }
+.card-thumb.is-empty .i { width: 30px; height: 30px; }
+.card-thumb:not(.is-empty) { transition: transform .2s var(--ease); }
+a.card-thumb:not(.is-empty):hover { transform: scale(1.03); }
+.card.is-taken .card-thumb img { filter: grayscale(.5); }
+
+.image-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.image-preview {
+  display: grid; place-items: center; overflow: hidden;
+  width: 72px; height: 72px; border-radius: 12px; background: #fff; border: 1px solid var(--line);
+}
+.image-preview img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.image-preview.is-empty { background: var(--surface-2); color: var(--line-strong); }
+.btn-file { position: relative; overflow: hidden; cursor: pointer; }
+.btn-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.btn-file:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Handy: Bild neben Titel und Notiz, Schilder darunter über die volle Breite. */
+@media (max-width: 559.98px) {
+  .card-body { display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 0 12px; align-items: start; }
+  .card-thumb { grid-row: 1 / span 2; width: 64px; height: 64px; border-radius: 10px; }
+  .card-thumb.is-empty .i { width: 26px; height: 26px; }
+  .card-text { display: contents; }
+  .card-title, .card-note { grid-column: 2; }
+  .card-meta { grid-column: 1 / -1; }
+}
+
+@media (min-width: 560px) {
+  .card-thumb { width: 92px; height: 92px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-thumb:not(.is-empty), .image-preview:not(.is-empty) { background: #ece8e1; border-color: transparent; }
+  .card-thumb img, .image-preview img { filter: brightness(.94); }
+}

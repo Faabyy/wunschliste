@@ -29,9 +29,15 @@ kein Build-Schritt, keine externen Schriften oder CDNs.
   erscheinen Übersicht und Abschnitt automatisch wieder.
 - **Eigene Liste**: Wünsche mit Titel, Link (nur http/https, Anzeige als Domain), Notiz und Preis
   anlegen, bearbeiten, löschen und sortieren.
-- **Preis aus dem Link**: Ohne Preisangabe liest die Seite den Preis aus den Produktdaten des Shops
-  (JSON-LD, Meta-Tags, Microdata, Amazon-Muster) und zeigt ihn als „ca. …“. Shops mit Bot-Schutz
-  (z. B. Amazon, Decathlon) blocken das. Dann trägt man den Preis von Hand ein.
+- **Preis und Bild aus dem Link**: Ohne eigene Angabe liest die Seite Preis und Vorschaubild aus den
+  Produktdaten des Shops (JSON-LD, Meta-Tags, Microdata). Der Preis erscheint als „ca. …“.
+  **Amazon und eBay sperren automatische Abrufe bewusst**, das wird nicht umgangen. Bei Amazon kommt
+  das Bild trotzdem über die öffentliche Bildadresse zur Artikelnummer, den Preis trägt man von
+  Hand ein. Bei eBay beides von Hand. Die Seite weist nach dem Speichern darauf hin.
+- **Eigene Bilder**: Pro Wunsch lässt sich ein Bild hochladen (JPEG, PNG, GIF, WebP, kein SVG). Der
+  Browser verkleinert es vorher. Metadaten wie der GPS-Standort von Handyfotos werden entfernt.
+  Bilder liegen in `data/bilder/` und werden nur an Angemeldete ausgeliefert. Fremde Bildserver
+  sehen so keine Besucher.
 - **Geheime Reservierung**: Andere sehen „Anna schenkt das“, der Besitzer sieht nichts. Nur wer
   reserviert hat, kann die Reservierung aufheben.
 - **Hinweise an Schenkende**: Löscht der Besitzer einen reservierten Wunsch, bekommt der Schenkende

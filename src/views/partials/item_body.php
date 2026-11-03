@@ -4,8 +4,17 @@
  * @var array $it
  */
 $hasPrice = $it['price_cents'] !== null;
+$thumb = $it['image'] !== null
+    ? '<img src="' . e(Images::url($it['image'])) . '" alt="" loading="lazy" decoding="async">'
+    : icon('gift');
 ?>
 <div class="card-body">
+  <?php if ($it['url'] !== null): ?>
+    <a class="card-thumb<?= $it['image'] === null ? ' is-empty' : '' ?>" href="<?= e($it['url']) ?>" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true"><?= $thumb ?></a>
+  <?php else: ?>
+    <span class="card-thumb<?= $it['image'] === null ? ' is-empty' : '' ?>" aria-hidden="true"><?= $thumb ?></span>
+  <?php endif; ?>
+  <div class="card-text">
   <h3 class="card-title"><?= e($it['title']) ?></h3>
   <?php if ($it['note'] !== null && $it['note'] !== ''): ?>
     <p class="card-note"><?= e($it['note']) ?></p>
@@ -20,4 +29,5 @@ $hasPrice = $it['price_cents'] !== null;
       <?php endif; ?>
     </p>
   <?php endif; ?>
+  </div>
 </div>

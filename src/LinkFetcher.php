@@ -2,29 +2,70 @@
 declare(strict_types=1);
 
 /**
- * Liest den Preis von einer Produktseite (JSON-LD, Meta-Tags, Microdata, Amazon).
+ * Liest Preis und Vorschaubild von einer Produktseite (JSON-LD, Meta-Tags, Microdata) und lädt Bilder.
+ *
+ * Amazon und eBay sperren automatische Abrufe ihrer Seiten bewusst; das wird nicht umgangen.
+ * Bei Amazon kommt das Bild über die öffentliche Bildadresse zur Artikelnummer (ASIN).
  *
  * Weil die Seite öffentlich erreichbar ist, darf der Abruf nicht als Werkzeug gegen das eigene Netz
  * taugen (SSRF): nur Ports 80/443, nur öffentliche IPv4-Adressen, und verbunden wird genau mit der
  * geprüften Adresse. Weiterleitungen werden einzeln nach denselben Regeln geprüft.
  */
-final class PriceFetcher
+final class LinkFetcher
 {
-    private const MAX_BYTES = 2_000_000;
+    private const MAX_HTML = 2_000_000;
+    public const MAX_IMAGE = 5_000_000;
     private const MAX_HOPS = 4;
     private const TIMEOUT = 8.0;
     private const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36';
 
-    /** @return array{cents:int, currency:string}|null */
-    public static function fetch(string $url): ?array
+    /**
+     * Was sich aus dem Link lesen lässt.
+     * @return array{price: ?array{cents:int, currency:string}, image: ?string, shop: ?string}
+     */
+    public static function inspect(string $url): array
     {
-        $html = self::download($url);
-        return $html === null ? null : self::extract($html);
+        $page = self::download($url, self::MAX_HTML);
+        $final = $page['url'] ?? $url;
+        $shop = self::shop($final) ?? self::shop($url);
+        $html = $page['body'] ?? '';
+        $price = $shop === null && $html !== '' ? self::extractPrice($html) : null;
+        $image = $shop === null && $html !== '' ? self::extractImage($html, $final) : null;
+        if ($shop === 'amazon' && ($asin = self::amazonAsin($final) ?? self::amazonAsin($url)) !== null) {
+            $image = 'https://images-na.ssl-images-amazon.com/images/P/' . $asin . '.01._SCLZZZZZZZ_.jpg';
+        }
+        return ['price' => $price, 'image' => $image, 'shop' => $shop];
+    }
+
+    /** Shops, die automatische Abrufe sperren. */
+    public static function shop(string $url): ?string
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if (preg_match('/(^|\.)(amazon\.[a-z.]+|amzn\.(to|eu|com|de)|a\.co)$/', $host) === 1) {
+            return 'amazon';
+        }
+        if (preg_match('/(^|\.)(ebay\.[a-z.]+|ebay\.us)$/', $host) === 1) {
+            return 'ebay';
+        }
+        return null;
+    }
+
+    public static function amazonAsin(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if (preg_match('~/(?:dp|gp/product|gp/aw/d|exec/obidos/ASIN|o/ASIN)/([A-Z0-9]{10})(?:[/?]|$)~i', $path, $m) === 1) {
+            return strtoupper($m[1]);
+        }
+        return null;
     }
 
     // ---------- Abruf ----------
 
-    public static function download(string $url): ?string
+    /**
+     * Lädt eine Adresse und folgt Weiterleitungen. Gibt auch bei Fehlerstatus die Zieladresse zurück.
+     * @return array{url: string, status: int, type: string, body: string}|null
+     */
+    public static function download(string $url, int $maxBytes): ?array
     {
         // Manche Webspaces sperren Netzwerkfunktionen; dann gibt es eben keinen Preis.
         if (!self::available()) {
@@ -54,7 +95,7 @@ final class PriceFetcher
                 return null;
             }
 
-            $response = self::request($scheme, $host, $ip, $port, $target, $deadline);
+            $response = self::request($scheme, $host, $ip, $port, $target, $deadline, $maxBytes);
             if ($response === null) {
                 return null;
             }
@@ -66,16 +107,18 @@ final class PriceFetcher
                 }
                 continue;
             }
-            if ($status !== 200) {
-                return null;
-            }
             $encoding = strtolower($headers['content-encoding'] ?? '');
             if ($encoding === 'gzip') {
                 $body = @gzdecode($body);
             } elseif ($encoding === 'deflate') {
                 $body = @gzuncompress($body) ?: @gzinflate($body);
             }
-            return is_string($body) ? $body : null;
+            return [
+                'url' => $url,
+                'status' => $status,
+                'type' => strtolower(trim(explode(';', $headers['content-type'] ?? '')[0])),
+                'body' => $status === 200 && is_string($body) ? $body : '',
+            ];
         }
         return null;
     }
@@ -91,7 +134,7 @@ final class PriceFetcher
     }
 
     /** @return array{0:int, 1:array<string,string>, 2:string}|null */
-    private static function request(string $scheme, string $host, string $ip, int $port, string $target, float $deadline): ?array
+    private static function request(string $scheme, string $host, string $ip, int $port, string $target, float $deadline, int $maxBytes): ?array
     {
         $remaining = $deadline - microtime(true);
         if ($remaining <= 0) {
@@ -121,7 +164,7 @@ final class PriceFetcher
             . "Sec-Fetch-Site: none\r\n"
             . "Connection: close\r\n\r\n");
         $raw = '';
-        while (!feof($fp) && strlen($raw) < self::MAX_BYTES && microtime(true) < $deadline) {
+        while (!feof($fp) && strlen($raw) < $maxBytes + 16384 && microtime(true) < $deadline) {
             $chunk = fread($fp, 65536);
             if ($chunk === false || ($chunk === '' && stream_get_meta_data($fp)['timed_out'])) {
                 break;
@@ -236,8 +279,76 @@ final class PriceFetcher
 
     // ---------- Auswertung ----------
 
+    /** Vorschaubild der Seite als absolute Adresse. */
+    public static function extractImage(string $html, string $pageUrl): ?string
+    {
+        $candidates = [];
+        preg_match_all('~<meta\b[^>]*>~i', $html, $m);
+        $meta = [];
+        foreach ($m[0] as $tag) {
+            $a = self::attributes($tag);
+            $key = strtolower($a['property'] ?? $a['name'] ?? $a['itemprop'] ?? '');
+            if ($key !== '' && isset($a['content']) && !isset($meta[$key])) {
+                $meta[$key] = $a['content'];
+            }
+        }
+        foreach (['og:image:secure_url', 'og:image', 'og:image:url', 'twitter:image', 'twitter:image:src', 'image'] as $key) {
+            if (isset($meta[$key])) {
+                $candidates[] = $meta[$key];
+            }
+        }
+        preg_match_all('~<script[^>]*type\s*=\s*["\']?application/ld\+json["\']?[^>]*>(.*?)</script>~is', $html, $ld);
+        foreach ($ld[1] as $json) {
+            $data = json_decode(trim($json), true);
+            if (is_array($data) && ($img = self::jsonLdImage($data, 0)) !== null) {
+                $candidates[] = $img;
+            }
+        }
+        if (preg_match('~<link\b[^>]*rel\s*=\s*["\']image_src["\'][^>]*>~i', $html, $l) === 1) {
+            $candidates[] = self::attributes($l[0])['href'] ?? '';
+        }
+        foreach ($candidates as $candidate) {
+            $candidate = html_entity_decode(trim($candidate), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($candidate === '' || str_starts_with($candidate, 'data:')) {
+                continue;
+            }
+            $abs = preg_match('~^https?://~i', $candidate) === 1 ? $candidate : self::resolveUrl($pageUrl, $candidate);
+            if ($abs !== null && strlen($abs) <= 2000) {
+                return $abs;
+            }
+        }
+        return null;
+    }
+
+    private static function jsonLdImage(array $node, int $depth): ?string
+    {
+        if ($depth > 12) {
+            return null;
+        }
+        $type = $node['@type'] ?? '';
+        $isProduct = $type === 'Product' || (is_array($type) && in_array('Product', $type, true));
+        if ($isProduct && isset($node['image'])) {
+            $img = $node['image'];
+            if (is_array($img)) {
+                $img = array_is_list($img) ? ($img[0] ?? null) : ($img['url'] ?? $img['contentUrl'] ?? null);
+                if (is_array($img)) {
+                    $img = $img['url'] ?? $img['contentUrl'] ?? null;
+                }
+            }
+            if (is_string($img) && $img !== '') {
+                return $img;
+            }
+        }
+        foreach ($node as $value) {
+            if (is_array($value) && ($found = self::jsonLdImage($value, $depth + 1)) !== null) {
+                return $found;
+            }
+        }
+        return null;
+    }
+
     /** @return array{cents:int, currency:string}|null */
-    public static function extract(string $html): ?array
+    public static function extractPrice(string $html): ?array
     {
         return self::fromJsonLd($html)
             ?? self::fromMeta($html)

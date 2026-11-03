@@ -16,6 +16,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
+import zlib
+import struct
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CODE = "tannenbaum"
@@ -52,6 +55,33 @@ class Browser:
         assert m, "kein CSRF-Token gefunden"
         return m.group(1)
 
+    def upload(self, path, data, files, follow=True):
+        """POST als multipart/form-data mit Dateien {feld: (name, bytes, typ)}."""
+        token = self.csrf(self.get("/")[1])
+        boundary = uuid.uuid4().hex
+        parts = []
+        for k, v in {**data, "_csrf": token}.items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        for k, (name, content, ctype) in files.items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{name}"\r\n'
+                         f'Content-Type: {ctype}\r\n\r\n'.encode() + content + b"\r\n")
+        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+        req = urllib.request.Request(self.base + path, data=body,
+                                     headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        opener = self.opener if follow else self.raw
+        try:
+            with opener.open(req) as r:
+                return r.status, r.read().decode(), dict(r.headers)
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode(), dict(e.headers)
+
+    def get_bytes(self, path):
+        try:
+            with self.opener.open(self.base + path) as r:
+                return r.status, r.read(), dict(r.headers)
+        except urllib.error.HTTPError as e:
+            return e.code, e.read(), dict(e.headers)
+
     def post(self, path, data, token=None, follow=True):
         if token is None:
             token = self.csrf(self.get("/")[1])
@@ -62,6 +92,15 @@ class Browser:
                 return r.status, r.read().decode(), dict(r.headers)
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode(), dict(e.headers)
+
+
+def make_png(w=120, h=90):
+    """Einfarbiges PNG, gebaut ohne Zusatzbibliotheken."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    raw = b"".join(b"\x00" + b"\xa7\x28\x3d" * w for _ in range(h))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
 def check(cond, msg):
@@ -299,6 +338,25 @@ def run(base, env):
     juergen.post(f"/hinweis/{notice}/ok", {"zurueck": "/"})
     s, html, _ = juergen.get("/")
     check(f"/hinweis/{notice}/ok" not in html, "Hinweis lässt sich ausblenden")
+
+    print("Bilder")
+    form = {"titel": "Wanderschuhe (braun)", "link": "https://www.amazon.de/dp/B0TEST", "notiz": "Größe 44", "preis": ""}
+    s, html, _ = fabian.upload(f"/eintrag/{shoes}", form, {"bild": ("schuh.png", make_png(), "image/png")})
+    m = re.search(r'src="(?:/wunschliste)?(/bild/[0-9a-f]{32})"', html)
+    check(m is not None, "Hochgeladenes Bild erscheint auf der Karte")
+    img = m.group(1)
+    s, data, h = fabian.get_bytes(img)
+    check(s == 200 and data.startswith(b"\x89PNG") and h.get("Content-Type") in ("image/png", "image/jpeg"), "Bild wird vom eigenen Server ausgeliefert")
+    check(img in juergen.get(f"/liste/{fabian_id}")[1], "Andere sehen das Bild")
+    s, data, _ = Browser(base).get_bytes(img)
+    check(not data.startswith(b"\x89PNG"), "Ohne Anmeldung kein Bild")
+    s, html, _ = fabian.upload(f"/eintrag/{shoes}", form, {"bild": ("boese.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", "image/svg+xml")})
+    check("kein Bild im Format" in html and img in html, "SVG-Upload abgelehnt, altes Bild bleibt")
+    stored = [f for f in os.listdir(os.path.join(env["WUNSCHLISTE_DATA"], "bilder")) if f.startswith(img.rsplit("/", 1)[1])]
+    path = os.path.join(env["WUNSCHLISTE_DATA"], "bilder", stored[0] if stored else "fehlt")
+    check(os.path.exists(path), "Bilddatei liegt in data/bilder")
+    fabian.post(f"/eintrag/{shoes}", {**form, "bild_entfernen": "1"})
+    check(not os.path.exists(path) and img not in fabian.get("/")[1], "Bild entfernen löscht die Datei")
 
     print("Gekauft, freigeben, Verwaltung")
     juergen.post(f"/eintrag/{shoes}/gekauft", {})

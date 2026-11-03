@@ -99,6 +99,9 @@ final class Database
                 SQL,
             // Status pro Konto: 1 = beschenkt (eigene Wunschliste), 0 = schenkt nur.
             2 => 'ALTER TABLE users ADD COLUMN can_wish INTEGER NOT NULL DEFAULT 1',
+            // Bild zum Wunsch (Dateiname in data/bilder/); image_manual = hochgeladen oder bewusst entfernt.
+            3 => 'ALTER TABLE items ADD COLUMN image TEXT;
+                  ALTER TABLE items ADD COLUMN image_manual INTEGER NOT NULL DEFAULT 0;',
         ];
     }
 

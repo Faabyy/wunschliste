@@ -15,7 +15,7 @@ return [
     // Voraussetzung: Für die (Sub-)Domain ist ein SSL-Zertifikat eingerichtet.
     'https' => true,
 
-    // false schaltet das Lesen von Preisen aus Links ab.
+    // false schaltet das Lesen von Preisen und Bildern aus Links ab.
     'preisabruf' => true,
 
     // Nur ausfüllen, wenn Links falsch aussehen: der Unterordner, z. B. '/wunschliste'.

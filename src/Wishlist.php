@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 final class Wishlist
 {
-    private const ITEM_COLUMNS = 'i.id, i.user_id, i.title, i.url, i.note, i.price_cents, i.price_currency, i.price_manual, i.position';
+    private const ITEM_COLUMNS = 'i.id, i.user_id, i.title, i.url, i.note, i.price_cents, i.price_currency, i.price_manual, i.image, i.image_manual, i.position';
 
     private static function db(): PDO
     {
@@ -131,6 +131,17 @@ final class Wishlist
             ->execute([$price['cents'] ?? null, $price['currency'] ?? null, $itemId]);
     }
 
+    /** Setzt das Bild eines Wunsches und löscht die alte Datei. */
+    public static function setImage(int $itemId, ?string $name, bool $manual): void
+    {
+        $old = self::one('SELECT image FROM items WHERE id = ?', [$itemId]);
+        self::db()->prepare('UPDATE items SET image = ?, image_manual = ? WHERE id = ?')
+            ->execute([$name, $manual ? 1 : 0, $itemId]);
+        if ($old !== null && $old['image'] !== $name) {
+            Images::delete($old['image']);
+        }
+    }
+
     /** Löscht einen eigenen Wunsch. War er reserviert, erfährt es nur der Schenkende. */
     public static function deleteItem(int $ownerId, int $itemId): void
     {
@@ -141,6 +152,7 @@ final class Wishlist
             }
             self::noticeRemoved($db, $item);
             $db->prepare('DELETE FROM items WHERE id = ? AND user_id = ?')->execute([$itemId, $ownerId]);
+            Images::delete($item['image']);
         });
     }
 
@@ -360,6 +372,7 @@ final class Wishlist
             }
             foreach (self::ownItems($id) as $item) {
                 self::noticeRemoved($db, $item);
+                Images::delete($item['image']);
             }
             $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
         });

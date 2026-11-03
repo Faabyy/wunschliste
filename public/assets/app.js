@@ -103,6 +103,44 @@
       old.replaceWith(fresh);
       fadeFlashes();
 
+  // Bild-Upload: im Browser auf 1200 px verkleinern und als JPEG neu zeichnen. Das spart Datenvolumen
+  // und entfernt Metadaten wie den GPS-Standort von Handyfotos. Ohne JS prüft und bereinigt der Server.
+  document.querySelectorAll('input[type="file"][data-resize]').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      let shown = file;
+      try {
+        if (window.createImageBitmap && window.DataTransfer && file.type !== 'image/gif') {
+          const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+          const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(bitmap.width * scale);
+          canvas.height = Math.round(bitmap.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+          if (blob) {
+            shown = new File([blob], 'bild.jpg', { type: 'image/jpeg' });
+            const transfer = new DataTransfer();
+            transfer.items.add(shown);
+            input.files = transfer.files;
+          }
+        }
+      } catch (e) { /* dann geht die Originaldatei hoch */ }
+      const preview = input.form && input.form.querySelector('[data-preview]');
+      if (preview) {
+        const img = new Image();
+        img.alt = '';
+        img.src = URL.createObjectURL(shown);
+        preview.classList.remove('is-empty');
+        preview.replaceChildren(img);
+      }
+    });
+  });
+
   // Verwaltung: Prüfen, ob data/ aus dem Web abrufbar ist (dann käme der Inhalt der Probedatei zurück).
   document.querySelectorAll('[data-probe]').forEach(async (row) => {
     const detail = row.querySelector('.check-detail');
@@ -131,6 +169,44 @@
   }
 
   fadeFlashes();
+
+  // Bild-Upload: im Browser auf 1200 px verkleinern und als JPEG neu zeichnen. Das spart Datenvolumen
+  // und entfernt Metadaten wie den GPS-Standort von Handyfotos. Ohne JS prüft und bereinigt der Server.
+  document.querySelectorAll('input[type="file"][data-resize]').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      let shown = file;
+      try {
+        if (window.createImageBitmap && window.DataTransfer && file.type !== 'image/gif') {
+          const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+          const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(bitmap.width * scale);
+          canvas.height = Math.round(bitmap.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+          if (blob) {
+            shown = new File([blob], 'bild.jpg', { type: 'image/jpeg' });
+            const transfer = new DataTransfer();
+            transfer.items.add(shown);
+            input.files = transfer.files;
+          }
+        }
+      } catch (e) { /* dann geht die Originaldatei hoch */ }
+      const preview = input.form && input.form.querySelector('[data-preview]');
+      if (preview) {
+        const img = new Image();
+        img.alt = '';
+        img.src = URL.createObjectURL(shown);
+        preview.classList.remove('is-empty');
+        preview.replaceChildren(img);
+      }
+    });
+  });
 
   // Verwaltung: Prüfen, ob data/ aus dem Web abrufbar ist (dann käme der Inhalt der Probedatei zurück).
   document.querySelectorAll('[data-probe]').forEach(async (row) => {

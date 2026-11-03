@@ -60,7 +60,7 @@ $tabbar = count($nav) > 1;
 <main id="main" class="wrap main">
   <div id="flashes" class="flashes" aria-live="polite">
     <?php foreach ($flashes as $f): ?>
-      <p class="flash flash-<?= $f['type'] === 'error' ? 'error' : 'success' ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= e($f['message']) ?></p>
+      <p class="flash flash-<?= in_array($f['type'], ['error', 'info'], true) ? $f['type'] : 'success' ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= e($f['message']) ?></p>
     <?php endforeach; ?>
   </div>
   <?= $content ?>

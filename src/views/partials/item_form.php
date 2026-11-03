@@ -1,8 +1,9 @@
 <?php
 /** @var string $action @var array $values @var string $submit @var ?array $item */
-$autoPrice = $item !== null && !$item['price_manual'] && $item['price_cents'] !== null;
+$hasLink = $item !== null && $item['url'] !== null;
+$image = $item['image'] ?? null;
 ?>
-<form method="post" action="<?= e(url($action)) ?>" class="item-form stack">
+<form method="post" action="<?= e(url($action)) ?>" class="item-form stack" enctype="multipart/form-data">
   <?= Csrf::field() ?>
   <label class="field">
     <span class="label">Was wünschst du dir?</span>
@@ -22,11 +23,32 @@ $autoPrice = $item !== null && !$item['price_manual'] && $item['price_cents'] !=
       <input type="text" name="preis" maxlength="20" inputmode="decimal" value="<?= e($values['preis'] ?? '') ?>" placeholder="aus Link">
     </label>
   </div>
-  <p class="hint">Ohne Preisangabe versuche ich, den Preis aus dem Link zu lesen. Das klappt nicht bei jedem Shop.</p>
-  <?php if ($autoPrice): ?>
+
+  <div class="field image-field">
+    <span class="label">Bild <span class="opt">optional</span></span>
+    <div class="image-picker">
+      <span class="image-preview<?= $image ? '' : ' is-empty' ?>" data-preview>
+        <?php if ($image): ?><img src="<?= e(Images::url($image)) ?>" alt=""><?php else: ?><?= icon('image') ?><?php endif; ?>
+      </span>
+      <label class="btn btn-ghost btn-file">
+        <?= icon('upload') ?><span><?= $image ? 'Anderes Bild' : 'Bild wählen' ?></span>
+        <input type="file" name="bild" accept="image/jpeg,image/png,image/gif,image/webp" data-resize>
+      </label>
+    </div>
+    <?php if ($image): ?>
+      <label class="check-line">
+        <input type="checkbox" name="bild_entfernen" value="1">
+        <span>Bild entfernen</span>
+      </label>
+    <?php endif; ?>
+  </div>
+
+  <p class="hint">Ohne Preis oder Bild versuche ich, beides aus dem Link zu lesen. Das klappt nicht bei
+    jedem Shop. Amazon und eBay geben Preise nicht heraus.</p>
+  <?php if ($hasLink): ?>
     <label class="check-line">
-      <input type="checkbox" name="preis_neu" value="1">
-      <span>Preis neu aus dem Link lesen (zuletzt erkannt: <?= e(format_price((int) $item['price_cents'], $item['price_currency'])) ?>)</span>
+      <input type="checkbox" name="neu_lesen" value="1">
+      <span>Preis und Bild neu aus dem Link lesen<?= !$item['price_manual'] && $item['price_cents'] !== null ? ' (zuletzt erkannt: ' . e(format_price((int) $item['price_cents'], $item['price_currency'])) . ')' : '' ?></span>
     </label>
   <?php endif; ?>
   <div class="form-actions">
