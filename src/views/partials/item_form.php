@@ -2,7 +2,7 @@
 /** @var string $action @var array $values @var string $submit @var ?array $item */
 $autoPrice = $item !== null && !$item['price_manual'] && $item['price_cents'] !== null;
 ?>
-<form method="post" action="<?= e($action) ?>" class="item-form stack">
+<form method="post" action="<?= e(url($action)) ?>" class="item-form stack">
   <?= Csrf::field() ?>
   <label class="field">
     <span class="label">Was wünschst du dir?</span>
@@ -32,7 +32,7 @@ $autoPrice = $item !== null && !$item['price_manual'] && $item['price_cents'] !=
   <div class="form-actions">
     <button type="submit" class="btn btn-primary" data-busy="Speichere …"><?= e($submit) ?></button>
     <?php if ($item !== null): ?>
-      <a class="btn btn-ghost" href="/#e<?= (int) $item['id'] ?>">Abbrechen</a>
+      <a class="btn btn-ghost" href="<?= e(base_path()) ?>/#e<?= (int) $item['id'] ?>">Abbrechen</a>
     <?php endif; ?>
   </div>
 </form>

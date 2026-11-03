@@ -6,16 +6,64 @@ function e(string|int|float|null $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
 }
 
+/** Kam diese Anfrage per HTTPS (auch hinter einem Proxy)? */
+function request_is_https(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+}
+
 function is_https(): bool
 {
-    return Config::forceHttps()
-        || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+    return Config::forceHttps() || request_is_https();
+}
+
+/** Mit https = true in config.php wird http:// auf https:// umgeleitet (nicht für localhost). */
+function enforce_https(): void
+{
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+    if (!Config::forceHttps() || request_is_https() || $host === ''
+        || preg_match('/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/', $host) === 1
+        || preg_match('/^[A-Za-z0-9.\-]+(:\d+)?$/', $host) !== 1) {
+        return;
+    }
+    header('Location: https://' . preg_replace('/:\d+$/', '', $host) . ($_SERVER['REQUEST_URI'] ?? '/'), true, 308);
+    exit;
+}
+
+/**
+ * Pfad, unter dem die Seite läuft: '' für eine eigene (Sub-)Domain, sonst z. B. '/wunschliste'.
+ * Erkannt am Pfad von index.php; liegt public/ nicht als Web-Root, fällt „/public“ weg,
+ * weil die .htaccess im Hauptordner alles dorthin umleitet.
+ */
+function base_path(): string
+{
+    static $base = null;
+    if ($base !== null) {
+        return $base;
+    }
+    $configured = Config::basePath();
+    if ($configured !== null) {
+        return $base = $configured === '/' ? '' : $configured;
+    }
+    $dir = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'))), '/');
+    $uri = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+    if ($dir !== '' && str_ends_with($dir, '/public') && !str_starts_with($uri . '/', $dir . '/')) {
+        $dir = substr($dir, 0, -strlen('/public'));
+    }
+    return $base = $dir;
+}
+
+/** Interner Pfad wie '/listen' → vollständiger Pfad mit Unterordner. */
+function url(string $path): string
+{
+    return base_path() . $path;
 }
 
 function redirect(string $path): never
 {
-    header('Location: ' . $path, true, 303);
+    header('Location: ' . (str_starts_with($path, '/') ? url($path) : $path), true, 303);
     exit;
 }
 
@@ -77,7 +125,7 @@ function page(string $name, array $vars, string $title, string $active = ''): ne
 function asset(string $file): string
 {
     $mtime = @filemtime(dirname(__DIR__) . '/public/assets/' . $file);
-    return '/assets/' . $file . '?v=' . ($mtime ?: '1');
+    return url('/assets/' . $file) . '?v=' . ($mtime ?: '1');
 }
 
 function icon(string $name, string $class = ''): string

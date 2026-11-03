@@ -9,7 +9,7 @@ $values = $old ?: [
         : '',
 ];
 ?>
-<a class="back" href="/#e<?= (int) $item['id'] ?>"><?= icon('back') ?><span>Meine Liste</span></a>
+<a class="back" href="<?= e(base_path()) ?>/#e<?= (int) $item['id'] ?>"><?= icon('back') ?><span>Meine Liste</span></a>
 <header class="section-head">
   <h1>Wunsch bearbeiten</h1>
 </header>

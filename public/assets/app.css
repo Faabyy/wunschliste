@@ -501,3 +501,25 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px 
 @media (max-width: 420px) {
   .account-name > span:last-child { display: none; }
 }
+
+/* ---------- Server-Prüfung (Verwaltung) ---------- */
+
+.checks summary { cursor: pointer; display: flex; align-items: baseline; gap: 10px; margin-bottom: 0; }
+.checks[open] summary { margin-bottom: 12px; }
+.check-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.check-list li { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; font-size: .93rem; }
+.check-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); grid-row: span 2; align-self: center; }
+.check-ok .check-dot { background: var(--ok); }
+.check-warn .check-dot { background: #b8862b; }
+.check-fail .check-dot { background: var(--danger); }
+.check-label { font-weight: 600; }
+.check-detail { color: var(--muted); grid-column: 2; }
+@media (min-width: 560px) {
+  .check-list li { grid-template-columns: auto 15em 1fr; }
+  .check-dot { grid-row: auto; }
+  .check-detail { grid-column: auto; }
+}
+.login-hint { margin-top: 18px; }
+.account-rename { flex-wrap: nowrap; min-width: 0; }
+.account-rename .field-grow { flex: 1 1 auto; min-width: 0; }
+.account-rename .btn { padding: 0 14px; }

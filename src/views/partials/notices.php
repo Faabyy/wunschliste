@@ -9,14 +9,14 @@
         <?php else: ?>
           <?= e($n['owner_name']) ?> hat einen Wunsch geändert, den du schenken willst:
           <?php if ($n['item_id'] !== null && $n['owner_id'] !== null): ?>
-            <a href="/liste/<?= (int) $n['owner_id'] ?>#e<?= (int) $n['item_id'] ?>"><strong><?= e($n['item_title']) ?></strong></a>.
+            <a href="<?= e(base_path()) ?>/liste/<?= (int) $n['owner_id'] ?>#e<?= (int) $n['item_id'] ?>"><strong><?= e($n['item_title']) ?></strong></a>.
           <?php else: ?>
             <strong><?= e($n['item_title']) ?></strong>.
           <?php endif; ?>
           Schau kurz, ob dein Geschenk noch passt.
         <?php endif; ?>
       </p>
-      <form method="post" action="/hinweis/<?= (int) $n['id'] ?>/ok" data-swap="notices">
+      <form method="post" action="<?= e(base_path()) ?>/hinweis/<?= (int) $n['id'] ?>/ok" data-swap="notices">
         <?= Csrf::field() ?>
         <input type="hidden" name="zurueck" value="<?= e($back) ?>">
         <button type="submit" class="btn-icon" title="Ausblenden" aria-label="Hinweis ausblenden"><?= icon('x') ?></button>

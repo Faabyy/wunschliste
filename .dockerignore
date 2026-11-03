@@ -1,5 +1,7 @@
 .git
 .env
+config.php
 data
 tests
+ftp-upload
 *.md

@@ -90,7 +90,11 @@ function fill_price(int $itemId, array $data): void
     if ($data['price_manual'] || $data['url'] === null || !Config::priceFetch()) {
         return;
     }
-    Wishlist::setPrice($itemId, PriceFetcher::fetch($data['url']));
+    try {
+        Wishlist::setPrice($itemId, PriceFetcher::fetch($data['url']));
+    } catch (Throwable $e) {
+        error_log('Preisabruf fehlgeschlagen: ' . $e->getMessage());
+    }
 }
 
 // ---------- Anmeldung ----------
@@ -99,7 +103,11 @@ function route_home(): void
 {
     $user = Auth::user();
     if ($user === null) {
-        page('login', ['needCode' => !Auth::codeOk(), 'old' => take_input()], 'Anmelden');
+        page('login', [
+            'needCode' => !Auth::codeOk(),
+            'old' => take_input(),
+            'noAccounts' => Wishlist::accounts() === [],
+        ], 'Anmelden');
     }
     $uid = (int) $user['id'];
     page('home', [
@@ -299,7 +307,26 @@ function route_admin(): void
     if (!Auth::isAdmin()) {
         page('admin_login', ['enabled' => Auth::adminEnabled()], 'Verwaltung');
     }
-    page('admin', ['accounts' => Wishlist::accounts()], 'Verwaltung');
+    page('admin', ['accounts' => Wishlist::accounts(), 'checks' => server_checks()], 'Verwaltung');
+}
+
+/** Prüfungen für den Betrieb, z. B. nach dem Hochladen per FTP. Status: ok, warn, fail. */
+function server_checks(): array
+{
+    $dataDir = Config::dataDir();
+    $checks = [
+        ['PHP-Version', PHP_VERSION_ID >= 80100 ? 'ok' : 'fail', PHP_VERSION . (PHP_VERSION_ID >= 80300 ? '' : ' (8.3 oder neuer empfohlen)')],
+        ['SQLite (pdo_sqlite)', 'ok', 'vorhanden'],
+        ['Ordner data/ beschreibbar', is_writable($dataDir) && is_writable($dataDir . '/sessions') ? 'ok' : 'fail',
+            is_writable($dataDir) ? 'ja' : 'nein: im FTP-Programm Rechte auf 755 (oder 775) setzen'],
+        ['config.php', Config::hasFile() ? 'ok' : 'warn', Config::hasFile() ? 'vorhanden' : 'fehlt, Einstellungen kommen nur aus Umgebungsvariablen'],
+        ['Zugangscode', Config::accessCode() !== '' ? 'ok' : 'warn', Config::accessCode() !== '' ? 'gesetzt' : 'nicht gesetzt: jeder, der die Adresse kennt, kommt rein'],
+        ['HTTPS', request_is_https() ? 'ok' : 'warn', request_is_https() ? 'aktiv' : 'diese Seite wurde ohne HTTPS geladen'],
+        ['Preise aus Links', !Config::priceFetch() ? 'warn' : (PriceFetcher::available() ? 'ok' : 'warn'),
+            !Config::priceFetch() ? 'ausgeschaltet' : (PriceFetcher::available() ? 'möglich' : 'der Server erlaubt keine Verbindungen nach außen')],
+        ['Unterordner', 'ok', base_path() === '' ? 'keiner (eigene Domain)' : base_path()],
+    ];
+    return $checks;
 }
 
 function route_admin_login(): void

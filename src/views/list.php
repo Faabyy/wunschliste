@@ -2,7 +2,7 @@
 $free = count(array_filter($items, static fn(array $it): bool => $it['giver_id'] === null));
 $back = '/liste/' . (int) $owner['id'];
 ?>
-<a class="back" href="/listen"><?= icon('back') ?><span>Alle Listen</span></a>
+<a class="back" href="<?= e(base_path()) ?>/listen"><?= icon('back') ?><span>Alle Listen</span></a>
 <header class="section-head list-head">
   <?= avatar($owner['name'], 'avatar-lg') ?>
   <div>

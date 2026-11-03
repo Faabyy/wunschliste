@@ -12,6 +12,7 @@ set_exception_handler(static function (Throwable $e): void {
     echo '<!doctype html><meta charset="utf-8"><title>Fehler</title><p>Da ist leider etwas schiefgelaufen. Bitte versuch es gleich noch einmal.</p>';
 });
 
+enforce_https();
 send_security_headers();
 start_session();
 
@@ -21,6 +22,10 @@ if ($method === 'HEAD') {
 }
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $path = is_string($path) && $path !== '' ? rawurldecode($path) : '/';
+$base = base_path();
+if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+    $path = substr($path, strlen($base)) ?: '/';
+}
 if ($path !== '/') {
     $path = rtrim($path, '/');
 }

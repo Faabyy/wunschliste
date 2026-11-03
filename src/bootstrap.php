@@ -37,7 +37,7 @@ function start_session(): void
     session_name('wunschliste');
     session_set_cookie_params([
         'lifetime' => SESSION_LIFETIME,
-        'path' => '/',
+        'path' => base_path() . '/',
         'secure' => is_https(),
         'httponly' => true,
         'samesite' => 'Lax',

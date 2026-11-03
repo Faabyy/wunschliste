@@ -20,14 +20,14 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
 <a class="skip" href="#main">Zum Inhalt springen</a>
 <header class="topbar">
   <div class="wrap topbar-inner">
-    <a class="brand" href="/"><?= icon('gift', 'brand-mark') ?><span>Wunschliste</span></a>
+    <a class="brand" href="<?= e(base_path()) ?>/"><?= icon('gift', 'brand-mark') ?><span>Wunschliste</span></a>
     <?php if ($user): ?>
       <nav class="mainnav" aria-label="Hauptmenü">
-        <a href="/"<?= $current('home') ?>>Meine Liste</a>
-        <a href="/listen"<?= $current('people') ?>>Andere Listen</a>
-        <a href="/schenken"<?= $current('gifts') ?>>Was ich schenke</a>
+        <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>>Meine Liste</a>
+        <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>>Andere Listen</a>
+        <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>>Was ich schenke</a>
       </nav>
-      <form class="account" method="post" action="/abmelden">
+      <form class="account" method="post" action="<?= e(base_path()) ?>/abmelden">
         <?= Csrf::field() ?>
         <span class="account-name"><?= avatar($user['name'], 'avatar-sm') ?><span><?= e($user['name']) ?></span></span>
         <button type="submit" class="btn-icon" title="Abmelden" aria-label="Abmelden"><?= icon('logout') ?></button>
@@ -47,9 +47,9 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
 
 <?php if ($user): ?>
 <nav class="tabbar" aria-label="Hauptmenü">
-  <a href="/"<?= $current('home') ?>><?= icon('list') ?><span>Meine Liste</span></a>
-  <a href="/listen"<?= $current('people') ?>><?= icon('users') ?><span>Andere</span></a>
-  <a href="/schenken"<?= $current('gifts') ?>><?= icon('gift') ?><span>Ich schenke</span></a>
+  <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>><?= icon('list') ?><span>Meine Liste</span></a>
+  <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>><?= icon('users') ?><span>Andere</span></a>
+  <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>><?= icon('gift') ?><span>Ich schenke</span></a>
 </nav>
 <?php endif; ?>
 </body>

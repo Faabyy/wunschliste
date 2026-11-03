@@ -8,7 +8,7 @@
   <ul class="people">
     <?php foreach ($people as $p): $items = (int) $p['items']; $free = (int) $p['free']; ?>
       <li>
-        <a class="person" href="/liste/<?= (int) $p['id'] ?>">
+        <a class="person" href="<?= e(base_path()) ?>/liste/<?= (int) $p['id'] ?>">
           <?= avatar($p['name']) ?>
           <span class="person-text">
             <span class="person-name"><?= e($p['name']) ?></span>

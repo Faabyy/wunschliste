@@ -1,4 +1,7 @@
 /data/*
 !/data/.gitkeep
+!/data/.htaccess
+!/data/schutztest.txt
+/config.php
 .env
-/tests/out/
+/ftp-upload/

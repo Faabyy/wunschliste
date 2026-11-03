@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Prüft die Kernfälle gegen einen echten `php -S`-Server mit leerem Datenordner.
 
-Aufruf: python3 tests/smoke.py
+Aufruf: python3 tests/smoke.py            (public/ als Web-Root, Einstellungen aus Umgebungsvariablen)
+        python3 tests/smoke.py webspace   (Webspace-Fall: Unterordner /wunschliste, config.php)
 Startet den Server selbst, legt Konten per bin/konten.php an und meldet am Ende OK oder den Fehler.
 """
 import http.cookiejar
@@ -71,15 +72,28 @@ def check(cond, msg):
 
 
 def main():
+    webspace = sys.argv[1:] == ["webspace"]
     data_dir = tempfile.mkdtemp(prefix="wunschliste-test-")
-    env = dict(os.environ, WUNSCHLISTE_DATA=data_dir, WUNSCHLISTE_CODE=CODE,
-               WUNSCHLISTE_ADMIN_PASSWORT=ADMIN, WUNSCHLISTE_PREISABRUF="0")
     port = free_port()
-    server = subprocess.Popen(["php", "-S", f"127.0.0.1:{port}", "-t", os.path.join(ROOT, "public")],
-                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if webspace:
+        config = os.path.join(data_dir, "config-test.php")
+        with open(config, "w") as f:
+            f.write(f"<?php return ['code' => '{CODE}', 'admin_passwort' => '{ADMIN}', 'https' => false, 'preisabruf' => false];\n")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("WUNSCHLISTE_")}
+        env.update(WUNSCHLISTE_DATA=os.path.join(data_dir, "data"), WUNSCHLISTE_CONFIG=config)
+        cmd = ["php", "-S", f"127.0.0.1:{port}", os.path.join(ROOT, "tests/webspace_router.php")]
+        base = f"http://127.0.0.1:{port}/wunschliste"
+    else:
+        env = dict(os.environ, WUNSCHLISTE_DATA=data_dir, WUNSCHLISTE_CODE=CODE,
+                   WUNSCHLISTE_ADMIN_PASSWORT=ADMIN, WUNSCHLISTE_PREISABRUF="0")
+        cmd = ["php", "-S", f"127.0.0.1:{port}", "-t", os.path.join(ROOT, "public")]
+        base = f"http://127.0.0.1:{port}"
+    server = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
         time.sleep(0.6)
-        run(f"http://127.0.0.1:{port}", env)
+        run(base, env)
+        if webspace:
+            run_webspace(base)
     finally:
         server.terminate()
         err = server.stderr.read().decode()
@@ -88,6 +102,28 @@ def main():
             print("PHP-Meldungen im Serverlog:\n" + "\n".join(bad))
             sys.exit(1)
     print("\nAlle Kernfälle OK.")
+
+
+def run_webspace(base):
+    print("Webspace-Fall")
+    b = Browser(base)
+    s, html, h = b.get("/")
+    check('href="/wunschliste/assets/app.css?v=' in html, "Assets mit Unterordner verlinkt")
+    check('action="/wunschliste/anmelden"' in html, "Formulare mit Unterordner")
+    check("path=/wunschliste/" in h.get("Set-Cookie", ""), "Cookie auf den Unterordner beschränkt")
+    s, css, h = b.get("/assets/app.css")
+    check(s == 200 and "--accent" in css, "CSS wird ausgeliefert")
+    s, _, h = b.post("/anmelden", {"code": CODE, "name": "Fabian"}, follow=False)
+    check(h.get("Location") == "/wunschliste/", "Weiterleitung bleibt im Unterordner")
+    for path in ("/data/schutztest.txt", "/data/wunschliste.sqlite", "/config.php", "/src/Config.php", "/public/../data/schutztest.txt"):
+        s, body, _ = b.get(path)
+        check("SCHUTZTEST" not in body and "SQLite format" not in body and "return [" not in body, f"{path} nicht abrufbar")
+    admin = Browser(base)
+    s, html, _ = admin.get("/verwaltung")
+    admin.post("/verwaltung/anmelden", {"passwort": ADMIN}, token=admin.csrf(html))
+    s, html, _ = admin.get("/verwaltung")
+    check("Server-Prüfung" in html and "/wunschliste/data/schutztest.txt" in html, "Server-Prüfung mit Datenbank-Test")
+    check("check-fail" not in html, "Server-Prüfung ohne Fehler")
 
 
 def konten(env, *args):

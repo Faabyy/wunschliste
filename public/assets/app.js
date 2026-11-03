@@ -102,6 +102,20 @@
     if (fresh && old) {
       old.replaceWith(fresh);
       fadeFlashes();
+
+  // Verwaltung: Prüfen, ob data/ aus dem Web abrufbar ist (dann käme der Inhalt der Probedatei zurück).
+  document.querySelectorAll('[data-probe]').forEach(async (row) => {
+    const detail = row.querySelector('.check-detail');
+    let open = false;
+    try {
+      const res = await fetch(row.dataset.probe, { cache: 'no-store', credentials: 'omit' });
+      open = res.ok && (await res.text()).includes(row.dataset.probeMarker);
+    } catch (e) { /* nicht erreichbar = geschützt */ }
+    row.className = open ? 'check-fail' : 'check-ok';
+    detail.textContent = open
+      ? 'NEIN: data/ ist aus dem Web abrufbar. .htaccess-Dateien mit hochladen bzw. public/ als Web-Root einstellen.'
+      : 'ja';
+  });
     }
   }
 
@@ -117,6 +131,20 @@
   }
 
   fadeFlashes();
+
+  // Verwaltung: Prüfen, ob data/ aus dem Web abrufbar ist (dann käme der Inhalt der Probedatei zurück).
+  document.querySelectorAll('[data-probe]').forEach(async (row) => {
+    const detail = row.querySelector('.check-detail');
+    let open = false;
+    try {
+      const res = await fetch(row.dataset.probe, { cache: 'no-store', credentials: 'omit' });
+      open = res.ok && (await res.text()).includes(row.dataset.probeMarker);
+    } catch (e) { /* nicht erreichbar = geschützt */ }
+    row.className = open ? 'check-fail' : 'check-ok';
+    detail.textContent = open
+      ? 'NEIN: data/ ist aus dem Web abrufbar. .htaccess-Dateien mit hochladen bzw. public/ als Web-Root einstellen.'
+      : 'ja';
+  });
 
   // Nach dem Hinzufügen das Formular wieder zuklappen lassen, aber Fokus aufs Titelfeld beim Öffnen.
   const adder = document.querySelector('.adder');

@@ -1,4 +1,9 @@
-# Für Apache ohne eigene VirtualHost-Konfiguration (z. B. Webspace).
-# Im Docker-Image steht dasselbe in docker/apache.conf.
-Options -Indexes
-FallbackResource /index.php
+# Alles, was keine vorhandene Datei ist, geht an index.php.
+# (Im Docker-Image steht dasselbe in docker/apache.conf.)
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>

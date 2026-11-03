@@ -19,7 +19,6 @@ final class Database
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA busy_timeout = 5000');
-        $pdo->exec('PRAGMA journal_mode = WAL');
         $pdo->exec('PRAGMA foreign_keys = ON');
         self::migrate($pdo);
         return self::$pdo = $pdo;

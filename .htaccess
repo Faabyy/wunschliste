@@ -1,0 +1,31 @@
+# Nur wirksam, wenn dieser Hauptordner im Web liegt (z. B. per FTP in den Webspace geladen).
+# Alles wird nach public/ umgeleitet, damit data/, src/ und config.php nie erreichbar sind.
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^public/ - [L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Ohne mod_rewrite lieber gar nichts ausliefern als die Datenbank.
+<IfModule !mod_rewrite.c>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</IfModule>
+
+# Zusätzlich: diese Dateien nie ausliefern.
+<FilesMatch "^(config\.php|config\.sample\.php|\.env.*|.*\.sqlite.*|docker-compose\.yml|Dockerfile)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

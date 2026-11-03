@@ -65,6 +65,34 @@ keine Web-Verwaltung. Mit beidem:
 WUNSCHLISTE_CODE=tannenbaum WUNSCHLISTE_ADMIN_PASSWORT=geheim php -S localhost:8000 -t public
 ```
 
+## Hochladen per FTP (Webspace)
+
+Läuft auf normalem Webspace mit **Apache, PHP 8.1 oder neuer (empfohlen 8.3+) und pdo_sqlite**,
+ohne Kommandozeile.
+
+1. Paket bauen: `bin/ftp-paket.sh` legt `ftp-upload/wunschliste/` an. Darin ist nur, was auf den
+   Server gehört, keine Docker- und Testdateien.
+2. Im Paket `config.sample.php` kopieren zu `config.php` und mindestens `code` (Zugangscode für
+   alle) und `admin_passwort` (für dich) eintragen.
+3. Den Ordner per FTP hochladen. **Wichtig:** Die versteckten Dateien `.htaccess` (im Hauptordner,
+   in `public/`, `src/` und `data/`) müssen mit. Im FTP-Programm ggf. „versteckte Dateien
+   anzeigen“ einschalten.
+4. Wohin? Am besten bekommt die Seite eine eigene Subdomain (z. B. `wunsch.example.de`), deren
+   Zielverzeichnis auf `wunschliste/public` zeigt. Geht das nicht, kann der Ordner auch so in einen
+   Unterordner (`example.de/wunschliste/`). Dann leitet die `.htaccess` im Hauptordner alles nach
+   `public/` um, und `data/`, `src/` und `config.php` bleiben unerreichbar.
+5. Falls `data/` nicht beschreibbar ist: im FTP-Programm die Rechte des Ordners auf 755 (oder 775)
+   setzen.
+6. `…/verwaltung` öffnen und mit dem Verwaltungspasswort anmelden. Oben steht die
+   **Server-Prüfung**: PHP-Version, Schreibrechte, HTTPS und ob die Datenbank vor Abruf aus dem Web
+   geschützt ist. Alles sollte grün sein. Dann die Konten anlegen.
+
+**Updates:** Paket neu bauen und hochladen. `config.php` und `data/` auf dem Server dabei nicht
+löschen. Das Paket enthält beides nicht, also wird nichts überschrieben.
+
+**HTTPS:** Mit `'https' => true` (Vorgabe in der Vorlage) leitet die Seite `http://` auf
+`https://` um. Für die (Sub-)Domain muss dafür ein SSL-Zertifikat eingerichtet sein.
+
 ## Betrieb mit Docker
 
 ```sh
@@ -92,13 +120,17 @@ gleich aus, dann gilt die Bremse für alle gemeinsam.
 
 ## Einstellungen
 
-| Variable | Bedeutung |
-|---|---|
-| `WUNSCHLISTE_CODE` | Gemeinsamer Zugangscode. Leer = kein Code. Ändern meldet alle Geräte ab. |
-| `WUNSCHLISTE_ADMIN_PASSWORT` | Passwort für `/verwaltung`. Leer = Web-Verwaltung aus. |
-| `WUNSCHLISTE_HTTPS` | `1` erzwingt das Secure-Flag am Cookie (hinter einem TLS-Proxy). |
-| `WUNSCHLISTE_PREISABRUF` | `0` schaltet das Lesen von Preisen aus Links ab. |
-| `WUNSCHLISTE_DATA` | Anderer Datenordner (Standard: `data/` neben `public/`). |
+Entweder in `config.php` (Vorlage `config.sample.php`) oder als Umgebungsvariable. Eine gesetzte
+Umgebungsvariable hat Vorrang.
+
+| `config.php` | Umgebungsvariable | Bedeutung |
+|---|---|---|
+| `code` | `WUNSCHLISTE_CODE` | Gemeinsamer Zugangscode. Leer = kein Code. Ändern meldet alle Geräte ab. |
+| `admin_passwort` | `WUNSCHLISTE_ADMIN_PASSWORT` | Passwort für `/verwaltung`. Leer = Verwaltung aus. |
+| `https` | `WUNSCHLISTE_HTTPS` | `true`/`1`: auf HTTPS umleiten, Cookie nur über HTTPS. |
+| `preisabruf` | `WUNSCHLISTE_PREISABRUF` | `false`/`0` schaltet das Lesen von Preisen aus Links ab. |
+| `basispfad` | `WUNSCHLISTE_BASISPFAD` | Unterordner, falls die automatische Erkennung nicht passt. |
+| `datenordner` | `WUNSCHLISTE_DATA` | Anderer Datenordner (Standard: `data/` neben `public/`). |
 
 ## Konten auf der Kommandozeile
 
@@ -128,7 +160,7 @@ Hinweis.
 public/        Web-Root: index.php (einziger Einstieg, Routing), assets/
 src/           bootstrap, Config, Database (Schema), Auth, Csrf, Throttle,
                Wishlist (alle Abfragen), PriceFetcher, routes.php, views/
-bin/konten.php Konten verwalten
+bin/           konten.php (Konten per Kommandozeile), ftp-paket.sh (Upload-Ordner bauen)
 data/          SQLite-Datenbank und Sessions (nicht im Git)
 docker/        Apache- und PHP-Konfiguration fürs Image
 tests/         smoke.py (Kernfälle gegen php -S), price_test.php
@@ -137,6 +169,7 @@ tests/         smoke.py (Kernfälle gegen php -S), price_test.php
 ## Tests
 
 ```sh
-python3 tests/smoke.py      # startet php -S selbst, nutzt einen leeren Datenordner
+python3 tests/smoke.py            # startet php -S selbst, nutzt einen leeren Datenordner
+python3 tests/smoke.py webspace   # dasselbe als Webspace-Fall: Unterordner, config.php
 php tests/price_test.php    # Preiserkennung und SSRF-Sperre, ohne Netz
 ```

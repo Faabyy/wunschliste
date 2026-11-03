@@ -17,16 +17,16 @@ $last = count($items) - 1;
         <li class="card card-own" id="e<?= $id ?>" data-id="<?= $id ?>">
           <?= view('partials/item_body', ['it' => $it]) ?>
           <div class="card-actions">
-            <form method="post" action="/eintrag/<?= $id ?>/hoch" data-swap="own-list">
+            <form method="post" action="<?= e(base_path()) ?>/eintrag/<?= $id ?>/hoch" data-swap="own-list">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-icon" title="Nach oben" aria-label="„<?= e($it['title']) ?>“ nach oben"<?= $n === 0 ? ' disabled' : '' ?>><?= icon('up') ?></button>
             </form>
-            <form method="post" action="/eintrag/<?= $id ?>/runter" data-swap="own-list">
+            <form method="post" action="<?= e(base_path()) ?>/eintrag/<?= $id ?>/runter" data-swap="own-list">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-icon" title="Nach unten" aria-label="„<?= e($it['title']) ?>“ nach unten"<?= $n === $last ? ' disabled' : '' ?>><?= icon('down') ?></button>
             </form>
-            <a class="btn-icon" href="/eintrag/<?= $id ?>" title="Bearbeiten" aria-label="„<?= e($it['title']) ?>“ bearbeiten"><?= icon('edit') ?></a>
-            <form method="post" action="/eintrag/<?= $id ?>/loeschen" data-swap="own-list" data-confirm="„<?= e($it['title']) ?>“ wirklich löschen?">
+            <a class="btn-icon" href="<?= e(base_path()) ?>/eintrag/<?= $id ?>" title="Bearbeiten" aria-label="„<?= e($it['title']) ?>“ bearbeiten"><?= icon('edit') ?></a>
+            <form method="post" action="<?= e(base_path()) ?>/eintrag/<?= $id ?>/loeschen" data-swap="own-list" data-confirm="„<?= e($it['title']) ?>“ wirklich löschen?">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-icon btn-danger" title="Löschen" aria-label="„<?= e($it['title']) ?>“ löschen"><?= icon('trash') ?></button>
             </form>

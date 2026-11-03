@@ -9,14 +9,14 @@ $class = 'card card-other' . ($giver !== null ? ' is-taken' : '') . ($mine ? ' i
   <?= view('partials/item_body', ['it' => $it]) ?>
   <div class="card-status">
     <?php if ($giver === null): ?>
-      <form method="post" action="/eintrag/<?= $id ?>/reservieren" data-swap="e<?= $id ?>">
+      <form method="post" action="<?= e(base_path()) ?>/eintrag/<?= $id ?>/reservieren" data-swap="e<?= $id ?>">
         <?= Csrf::field() ?>
         <input type="hidden" name="zurueck" value="<?= e($back) ?>">
         <button type="submit" class="btn btn-gift" data-focus><?= icon('gift') ?><span>Ich schenke das</span></button>
       </form>
     <?php elseif ($mine): ?>
       <span class="badge badge-mine"><?= check_mark() ?><span>Du schenkst das</span></span>
-      <form method="post" action="/eintrag/<?= $id ?>/freigeben" data-swap="e<?= $id ?>">
+      <form method="post" action="<?= e(base_path()) ?>/eintrag/<?= $id ?>/freigeben" data-swap="e<?= $id ?>">
         <?= Csrf::field() ?>
         <input type="hidden" name="zurueck" value="<?= e($back) ?>">
         <button type="submit" class="btn-text" data-focus>Doch nicht</button>

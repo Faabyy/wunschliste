@@ -4,11 +4,11 @@
     <div class="login-mark"><?= icon('key') ?></div>
     <h1>Verwaltung</h1>
     <?php if (!$enabled): ?>
-      <p class="sub">Die Web-Verwaltung ist ausgeschaltet. Setze <code>WUNSCHLISTE_ADMIN_PASSWORT</code>
-        oder lege Konten mit <code>php bin/konten.php</code> an.</p>
+      <p class="sub">Die Verwaltung ist ausgeschaltet. Trag in <code>config.php</code> ein
+        <code>admin_passwort</code> ein (Vorlage: <code>config.sample.php</code>).</p>
     <?php else: ?>
       <p class="sub">Konten anlegen, umbenennen und löschen.</p>
-      <form method="post" action="/verwaltung/anmelden" class="stack">
+      <form method="post" action="<?= e(base_path()) ?>/verwaltung/anmelden" class="stack">
         <?= Csrf::field() ?>
         <label class="field">
           <span class="label">Passwort</span>

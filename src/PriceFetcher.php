@@ -26,6 +26,10 @@ final class PriceFetcher
 
     public static function download(string $url): ?string
     {
+        // Manche Webspaces sperren Netzwerkfunktionen; dann gibt es eben keinen Preis.
+        if (!self::available()) {
+            return null;
+        }
         $deadline = microtime(true) + self::TIMEOUT;
         for ($hop = 0; $hop <= self::MAX_HOPS; $hop++) {
             $parts = parse_url($url);
@@ -74,6 +78,16 @@ final class PriceFetcher
             return is_string($body) ? $body : null;
         }
         return null;
+    }
+
+    public static function available(): bool
+    {
+        foreach (['stream_socket_client', 'gethostbynamel', 'stream_context_create'] as $fn) {
+            if (!function_exists($fn)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** @return array{0:int, 1:array<string,string>, 2:string}|null */
