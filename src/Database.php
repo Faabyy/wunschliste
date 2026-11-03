@@ -39,16 +39,11 @@ final class Database
         }
     }
 
-    private static function migrate(PDO $pdo): void
+    /** Schema-Versionen; jede Stufe läuft genau einmal, gezählt über PRAGMA user_version. */
+    private static function migrations(): array
     {
-        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 1) {
-            return;
-        }
-        $pdo->exec('BEGIN IMMEDIATE');
-        try {
-            // Nochmal prüfen: Ein paralleler Aufruf kann schon migriert haben.
-            if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 1) {
-                $pdo->exec(<<<'SQL'
+        return [
+            1 => <<<'SQL'
                     CREATE TABLE users (
                         id         INTEGER PRIMARY KEY,
                         name       TEXT NOT NULL,
@@ -101,9 +96,27 @@ final class Database
                         at   INTEGER NOT NULL
                     );
                     CREATE INDEX attempts_lookup ON attempts(ip, kind, at);
+                SQL,
+            // Status pro Konto: 1 = beschenkt (eigene Wunschliste), 0 = schenkt nur.
+            2 => 'ALTER TABLE users ADD COLUMN can_wish INTEGER NOT NULL DEFAULT 1',
+        ];
+    }
 
-                    PRAGMA user_version = 1;
-                    SQL);
+    private static function migrate(PDO $pdo): void
+    {
+        $target = max(array_keys(self::migrations()));
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= $target) {
+            return;
+        }
+        $pdo->exec('BEGIN IMMEDIATE');
+        try {
+            // Erst in der Sperre lesen: Ein paralleler Aufruf kann schon migriert haben.
+            $version = (int) $pdo->query('PRAGMA user_version')->fetchColumn();
+            foreach (self::migrations() as $step => $sql) {
+                if ($step > $version) {
+                    $pdo->exec($sql);
+                    $pdo->exec('PRAGMA user_version = ' . $step);
+                }
             }
             $pdo->exec('COMMIT');
         } catch (Throwable $e) {

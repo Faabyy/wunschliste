@@ -15,6 +15,17 @@ function require_user(): array
     return $user;
 }
 
+/** Wie require_user(), aber nur für Konten mit eigener Wunschliste. */
+function require_wisher(): array
+{
+    $user = require_user();
+    if (!$user['can_wish']) {
+        flash('error', 'Dein Konto hat keine eigene Wunschliste.');
+        redirect('/');
+    }
+    return $user;
+}
+
 function require_admin(): void
 {
     if (!Auth::isAdmin()) {
@@ -110,6 +121,12 @@ function route_home(): void
         ], 'Anmelden');
     }
     $uid = (int) $user['id'];
+    if (!$user['can_wish']) {
+        page('giver_home', [
+            'people' => Wishlist::others($uid),
+            'notices' => Wishlist::notices($uid),
+        ], 'Wunschlisten', 'people');
+    }
     page('home', [
         'user' => $user,
         'items' => Wishlist::ownItems($uid),
@@ -176,7 +193,7 @@ function route_list(string $id): void
         redirect('/');
     }
     $owner = Wishlist::userById($ownerId);
-    if ($owner === null) {
+    if ($owner === null || !$owner['can_wish']) {
         abort(404, 'Diese Liste gibt es nicht.');
     }
     page('list', [
@@ -199,7 +216,7 @@ function route_gifts(): void
 
 function route_item_create(): void
 {
-    $user = require_user();
+    $user = require_wisher();
     try {
         $data = item_input();
     } catch (UserError $e) {
@@ -215,7 +232,7 @@ function route_item_create(): void
 
 function route_item_edit(string $id): void
 {
-    $user = require_user();
+    $user = require_wisher();
     $item = Wishlist::ownItem((int) $user['id'], (int) $id);
     if ($item === null) {
         abort(404, 'Diesen Wunsch gibt es nicht, oder er gehört nicht dir.');
@@ -226,7 +243,7 @@ function route_item_edit(string $id): void
 
 function route_item_update(string $id): void
 {
-    $user = require_user();
+    $user = require_wisher();
     $uid = (int) $user['id'];
     $item = Wishlist::ownItem($uid, (int) $id);
     if ($item === null) {
@@ -258,14 +275,14 @@ function route_item_update(string $id): void
 
 function route_item_delete(string $id): void
 {
-    $user = require_user();
+    $user = require_wisher();
     attempt(fn() => Wishlist::deleteItem((int) $user['id'], (int) $id), 'Wunsch gelöscht.');
     redirect('/');
 }
 
 function route_item_move(string $id, string $direction): void
 {
-    $user = require_user();
+    $user = require_wisher();
     attempt(fn() => Wishlist::move((int) $user['id'], (int) $id, $direction === 'hoch' ? -1 : 1));
     redirect('/#e' . (int) $id);
 }
@@ -353,7 +370,7 @@ function route_admin_create(): void
 {
     require_admin();
     attempt(function (): void {
-        $user = Wishlist::createUser($_POST['name'] ?? '');
+        $user = Wishlist::createUser($_POST['name'] ?? '', ($_POST['status'] ?? '') === 'beschenkt');
         flash('success', 'Konto „' . $user['name'] . '“ angelegt.');
     });
     redirect('/verwaltung');
@@ -363,6 +380,16 @@ function route_admin_rename(string $id): void
 {
     require_admin();
     attempt(fn() => Wishlist::renameUser((int) $id, $_POST['name'] ?? ''), 'Umbenannt.');
+    redirect('/verwaltung');
+}
+
+function route_admin_status(string $id): void
+{
+    require_admin();
+    $canWish = ($_POST['status'] ?? '') === 'beschenkt';
+    attempt(fn() => Wishlist::setCanWish((int) $id, $canWish), $canWish
+        ? 'Das Konto hat jetzt eine Wunschliste.'
+        : 'Das Konto schenkt jetzt nur. Seine Wünsche bleiben gespeichert, sind aber ausgeblendet.');
     redirect('/verwaltung');
 }
 

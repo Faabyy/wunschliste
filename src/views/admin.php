@@ -31,6 +31,11 @@
       <span class="label">Name</span>
       <input type="text" name="name" required maxlength="40" autocomplete="off" placeholder="z. B. Oma Gerda">
     </label>
+    <fieldset class="status-choice">
+      <legend class="label">Status</legend>
+      <label><input type="radio" name="status" value="schenker" checked><span>Schenkt nur</span></label>
+      <label><input type="radio" name="status" value="beschenkt"><span>Beschenkt (eigene Wunschliste)</span></label>
+    </fieldset>
     <button type="submit" class="btn btn-primary"><?= icon('plus') ?><span>Anlegen</span></button>
   </form>
 </div>
@@ -48,7 +53,23 @@
           </label>
           <button type="submit" class="btn btn-ghost">Umbenennen</button>
         </form>
-        <span class="account-meta"><?= e(count_label((int) $a['items'], 'Wunsch', 'Wünsche')) ?></span>
+        <?php $hide = $a['can_wish'] && (int) $a['items'] > 0
+            ? 'Die ' . count_label((int) $a['items'], 'Wunsch', 'Wünsche') . ' von ' . $a['name'] . ' werden ausgeblendet, bleiben aber gespeichert. Fortfahren?'
+            : ''; ?>
+        <form method="post" action="<?= e(base_path()) ?>/verwaltung/konto/<?= $id ?>/status" class="status-toggle"<?= $hide !== '' ? ' data-confirm="' . e($hide) . '"' : '' ?>>
+          <?= Csrf::field() ?>
+          <?php if ($a['can_wish']): ?>
+            <span class="status-badge status-wish"><?= icon('gift') ?>Beschenkt</span>
+            <span class="account-meta"><?= e(count_label((int) $a['items'], 'Wunsch', 'Wünsche')) ?></span>
+            <input type="hidden" name="status" value="schenker">
+            <button type="submit" class="btn-text">auf „schenkt nur“ setzen</button>
+          <?php else: ?>
+            <span class="status-badge">Schenkt nur</span>
+            <?php if ((int) $a['items'] > 0): ?><span class="account-meta"><?= e(count_label((int) $a['items'], 'Wunsch', 'Wünsche')) ?> ausgeblendet</span><?php endif; ?>
+            <input type="hidden" name="status" value="beschenkt">
+            <button type="submit" class="btn-text">Wunschliste geben</button>
+          <?php endif; ?>
+        </form>
         <form method="post" action="<?= e(base_path()) ?>/verwaltung/konto/<?= $id ?>/loeschen" data-confirm="Konto „<?= e($a['name']) ?>“ mit allen Wünschen löschen? Das lässt sich nicht rückgängig machen.">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-icon btn-danger" title="Löschen" aria-label="Konto „<?= e($a['name']) ?>“ löschen"><?= icon('trash') ?></button>

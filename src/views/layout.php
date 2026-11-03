@@ -23,8 +23,12 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
     <a class="brand" href="<?= e(base_path()) ?>/"><?= icon('gift', 'brand-mark') ?><span>Wunschliste</span></a>
     <?php if ($user): ?>
       <nav class="mainnav" aria-label="Hauptmenü">
-        <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>>Meine Liste</a>
-        <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>>Andere Listen</a>
+        <?php if ($user['can_wish']): ?>
+          <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>>Meine Liste</a>
+          <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>>Andere Listen</a>
+        <?php else: ?>
+          <a href="<?= e(base_path()) ?>/"<?= $current('people') ?>>Wunschlisten</a>
+        <?php endif; ?>
         <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>>Was ich schenke</a>
       </nav>
       <form class="account" method="post" action="<?= e(base_path()) ?>/abmelden">
@@ -47,8 +51,12 @@ $current = static fn(string $key): string => $active === $key ? ' aria-current="
 
 <?php if ($user): ?>
 <nav class="tabbar" aria-label="Hauptmenü">
-  <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>><?= icon('list') ?><span>Meine Liste</span></a>
-  <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>><?= icon('users') ?><span>Andere</span></a>
+  <?php if ($user['can_wish']): ?>
+    <a href="<?= e(base_path()) ?>/"<?= $current('home') ?>><?= icon('list') ?><span>Meine Liste</span></a>
+    <a href="<?= e(base_path()) ?>/listen"<?= $current('people') ?>><?= icon('users') ?><span>Andere</span></a>
+  <?php else: ?>
+    <a href="<?= e(base_path()) ?>/"<?= $current('people') ?>><?= icon('users') ?><span>Wunschlisten</span></a>
+  <?php endif; ?>
   <a href="<?= e(base_path()) ?>/schenken"<?= $current('gifts') ?>><?= icon('gift') ?><span>Ich schenke</span></a>
 </nav>
 <?php endif; ?>

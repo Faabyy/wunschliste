@@ -20,6 +20,10 @@ kein Build-Schritt, keine externen Schriften oder CDNs.
   optional ein gemeinsamer **Zugangscode**, den man einmal pro Gerät eingibt.
 - **Konten legt nur der Betreiber an**: über `/verwaltung` (eigenes Passwort) oder auf der
   Kommandozeile. Unbekannte Namen werden abgelehnt.
+- **Zwei Status pro Konto**: *Beschenkt* (eigene Wunschliste, kann auch schenken) oder *schenkt nur*
+  (keine eigene Liste, sieht direkt die Wunschlisten der Beschenkten). Neue Konten schenken
+  standardmäßig nur. Wechselt ein beschenktes Konto auf „schenkt nur“, bleiben seine Wünsche und
+  Reservierungen gespeichert, sind aber für alle ausgeblendet, bis du es zurückstellst.
 - **Eigene Liste**: Wünsche mit Titel, Link (nur http/https, Anzeige als Domain), Notiz und Preis
   anlegen, bearbeiten, löschen und sortieren.
 - **Preis aus dem Link**: Ohne Preisangabe liest die Seite den Preis aus den Produktdaten des Shops
@@ -53,7 +57,7 @@ Das ist serverseitig abgesichert, nicht nur in der Anzeige:
 ## Lokal starten
 
 ```sh
-php bin/konten.php anlegen "Fabian"      # erstes Konto anlegen
+php bin/konten.php anlegen "Fabian" beschenkt   # erstes Konto anlegen
 php -S localhost:8000 -t public
 ```
 
@@ -98,7 +102,7 @@ löschen. Das Paket enthält beides nicht, also wird nichts überschrieben.
 ```sh
 cp .env.example .env        # Code und Verwaltungspasswort eintragen
 docker compose up -d --build
-docker compose exec -u www-data wunschliste php bin/konten.php anlegen "Fabian"
+docker compose exec -u www-data wunschliste php bin/konten.php anlegen "Fabian" beschenkt
 ```
 
 Die Seite läuft dann auf Port 8080. Die Daten liegen im benannten Volume `wunschliste-data`
@@ -136,7 +140,9 @@ Umgebungsvariable hat Vorrang.
 
 ```sh
 php bin/konten.php liste
-php bin/konten.php anlegen "Oma Gerda"
+php bin/konten.php anlegen "Lena" beschenkt     # mit eigener Wunschliste
+php bin/konten.php anlegen "Oma Gerda"          # schenkt nur (Standard)
+php bin/konten.php status "Oma Gerda" beschenkt
 php bin/konten.php umbenennen "Oma Gerda" "Oma"
 php bin/konten.php loeschen "Oma"
 ```

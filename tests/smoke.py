@@ -139,10 +139,10 @@ def login(base, name):
 
 def run(base, env):
     print("Konten")
-    check(konten(env, "anlegen", "Fabian").returncode == 0, "Konto Fabian per CLI angelegt")
+    check(konten(env, "anlegen", "Fabian", "beschenkt").returncode == 0, "Konto Fabian per CLI angelegt")
     check(konten(env, "anlegen", "  FABIAN ").returncode == 1, "Doppelter Name (andere Schreibweise) abgelehnt")
-    check(konten(env, "anlegen", "Jürgen").returncode == 0, "Konto Jürgen angelegt")
-    konten(env, "anlegen", "Anna")
+    check(konten(env, "anlegen", "Jürgen", "beschenkt").returncode == 0, "Konto Jürgen angelegt")
+    check(konten(env, "anlegen", "Anna").returncode == 0, "Konto Anna (schenkt nur) angelegt")
 
     anon = Browser(base)
     s, html, h = anon.get("/")
@@ -278,6 +278,46 @@ def run(base, env):
 
     s, html, _ = anon.get("/eintrag/1")
     check("Dein Name" in html, "Ohne Anmeldung keine Unterseiten")
+
+    print("Status: beschenkt oder schenkt nur")
+    ids = {m.group(2): int(m.group(1)) for m in re.finditer(r"^\s*(\d+)\s+(\S+)", konten(env, "liste").stdout, re.M)}
+    check("Oma" in ids and "schenker" in [l.split()[-3] for l in konten(env, "liste").stdout.splitlines() if "Oma Gerda" in l],
+          "Neues Konto aus der Verwaltung schenkt standardmäßig nur")
+    s, html, _ = anna.get("/")
+    check("Wunschlisten" in html and "Wunsch hinzufügen" not in html and "Meine Liste" not in html,
+          "Schenkerin sieht Wunschlisten statt eigener Liste")
+    check(f"/liste/{fabian_id}" in html, "Schenkerin sieht Fabians Liste in der Übersicht")
+    s, html, _ = anna.post("/eintrag", {"titel": "Darf nicht", "link": "", "notiz": "", "preis": ""})
+    check("keine eigene Wunschliste" in html, "Schenkerin kann keinen Wunsch anlegen")
+    check("Darf nicht" not in konten(env, "liste").stdout and "Darf nicht" not in anna.get(f"/liste/{fabian_id}")[1],
+          "Kein Wunsch der Schenkerin gespeichert oder sichtbar")
+    s, html, _ = fabian.get("/listen")
+    check(f'/liste/{ids["Anna"]}"' not in html, "Schenkerin taucht nicht in den Listen auf")
+    s, _, _ = fabian.get(f"/liste/{ids['Anna']}")
+    check(s == 404, "Liste einer Schenkerin gibt es nicht (404)")
+
+    juergen_id = ids["Jürgen"]
+    juergen.post("/eintrag", {"titel": "Fahrradlampe", "link": "", "notiz": "", "preis": ""})
+    jitem = int(re.search(r'<li class="card card-own" id="e(\d+)"', juergen.get("/")[1]).group(1))
+    fabian.post(f"/eintrag/{jitem}/reservieren", {"zurueck": f"/liste/{juergen_id}"})
+    check("Fahrradlampe" in fabian.get("/schenken")[1], "Fabian schenkt Jürgen die Fahrradlampe")
+
+    s, html, _ = admin.get("/verwaltung")
+    admin.post(f"/verwaltung/konto/{juergen_id}/status", {"status": "schenker"}, token=admin.csrf(html))
+    check(f'/liste/{juergen_id}"' not in fabian.get("/listen")[1], "Jürgen auf „schenkt nur“: aus den Listen verschwunden")
+    check(fabian.get(f"/liste/{juergen_id}")[0] == 404, "Jürgens Liste nicht mehr abrufbar")
+    check("Fahrradlampe" not in fabian.get("/schenken")[1], "Reservierung auf ausgeblendeter Liste ausgeblendet")
+    s, html, _ = fabian.post(f"/eintrag/{jitem}/freigeben", {"zurueck": "/schenken"})
+    check("gibt es nicht mehr" in html, "Ausgeblendeter Wunsch lässt sich nicht bearbeiten")
+    check("Wunschlisten" in juergen.get("/")[1], "Jürgen sieht jetzt die Schenker-Startseite")
+    s, html, _ = juergen.get(f"/eintrag/{jitem}")
+    check("keine eigene Wunschliste" in html, "Jürgen kann seine ausgeblendeten Wünsche nicht bearbeiten")
+    s, html, _ = admin.get("/verwaltung")
+    check("ausgeblendet" in html, "Verwaltung zeigt ausgeblendete Wünsche an")
+
+    admin.post(f"/verwaltung/konto/{juergen_id}/status", {"status": "beschenkt"}, token=admin.csrf(html))
+    check("Fahrradlampe" in juergen.get("/")[1], "Zurück auf „beschenkt“: Wünsche wieder da")
+    check("Fahrradlampe" in fabian.get("/schenken")[1], "Zurück auf „beschenkt“: Reservierung wieder da")
 
 
 if __name__ == "__main__":

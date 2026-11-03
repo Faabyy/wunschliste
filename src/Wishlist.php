@@ -35,16 +35,16 @@ final class Wishlist
 
     public static function userById(int $id): ?array
     {
-        return self::one('SELECT id, name FROM users WHERE id = ?', [$id]);
+        return self::one('SELECT id, name, can_wish FROM users WHERE id = ?', [$id]);
     }
 
     public static function userByName(string $name): ?array
     {
         $key = name_key($name);
-        return $key === '' ? null : self::one('SELECT id, name FROM users WHERE name_key = ?', [$key]);
+        return $key === '' ? null : self::one('SELECT id, name, can_wish FROM users WHERE name_key = ?', [$key]);
     }
 
-    /** Alle anderen Nutzer mit Anzahl Wünsche und davon noch freien. */
+    /** Alle anderen Beschenkten mit Anzahl Wünsche und davon noch freien. */
     public static function others(int $viewerId): array
     {
         return self::all(
@@ -52,7 +52,7 @@ final class Wishlist
                FROM users u
                LEFT JOIN items i ON i.user_id = u.id
                LEFT JOIN reservations r ON r.item_id = i.id
-              WHERE u.id <> ?
+              WHERE u.id <> ? AND u.can_wish = 1
               GROUP BY u.id
               ORDER BY u.name_key',
             [$viewerId]
@@ -243,7 +243,7 @@ final class Wishlist
      */
     private static function assertForeign(int $viewerId, int $itemId): void
     {
-        $owner = self::one('SELECT user_id FROM items WHERE id = ?', [$itemId]);
+        $owner = self::one('SELECT i.user_id FROM items i JOIN users u ON u.id = i.user_id WHERE i.id = ? AND u.can_wish = 1', [$itemId]);
         if ($owner === null) {
             throw new UserError('Diesen Wunsch gibt es nicht mehr.');
         }
@@ -260,7 +260,7 @@ final class Wishlist
                FROM reservations r
                JOIN items i ON i.id = r.item_id
                JOIN users u ON u.id = i.user_id
-              WHERE r.user_id = ?
+              WHERE r.user_id = ? AND u.can_wish = 1
               ORDER BY u.name_key, i.position, i.id',
             [$viewerId]
         );
@@ -289,7 +289,7 @@ final class Wishlist
     public static function accounts(): array
     {
         return self::all(
-            'SELECT u.id, u.name, u.created_at, COUNT(i.id) AS items
+            'SELECT u.id, u.name, u.can_wish, u.created_at, COUNT(i.id) AS items
                FROM users u LEFT JOIN items i ON i.user_id = u.id
               GROUP BY u.id ORDER BY u.name_key'
         );
@@ -307,18 +307,19 @@ final class Wishlist
         return $name;
     }
 
-    public static function createUser(mixed $raw): array
+    public static function createUser(mixed $raw, bool $canWish): array
     {
         $name = self::validName($raw);
         try {
-            self::db()->prepare('INSERT INTO users (name, name_key) VALUES (?, ?)')->execute([$name, name_key($name)]);
+            self::db()->prepare('INSERT INTO users (name, name_key, can_wish) VALUES (?, ?, ?)')
+                ->execute([$name, name_key($name), $canWish ? 1 : 0]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
                 throw new UserError('Den Namen „' . $name . '“ gibt es schon.');
             }
             throw $e;
         }
-        return ['id' => (int) self::db()->lastInsertId(), 'name' => $name];
+        return ['id' => (int) self::db()->lastInsertId(), 'name' => $name, 'can_wish' => $canWish ? 1 : 0];
     }
 
     public static function renameUser(int $id, mixed $raw): void
@@ -334,6 +335,19 @@ final class Wishlist
             throw $e;
         }
         if ($stmt->rowCount() === 0) {
+            throw new UserError('Dieses Konto gibt es nicht.');
+        }
+    }
+
+    /**
+     * Beschenkt (eigene Liste) oder schenkt nur. Wünsche bleiben beim Wechsel erhalten und sind
+     * nur ausgeblendet, solange das Konto „schenkt nur“ ist.
+     */
+    public static function setCanWish(int $id, bool $canWish): void
+    {
+        $stmt = self::db()->prepare('UPDATE users SET can_wish = ? WHERE id = ?');
+        $stmt->execute([$canWish ? 1 : 0, $id]);
+        if (self::userById($id) === null) {
             throw new UserError('Dieses Konto gibt es nicht.');
         }
     }

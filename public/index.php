@@ -51,6 +51,7 @@ $routes = [
     ['POST', '#^/verwaltung/abmelden$#',                'route_admin_logout'],
     ['POST', '#^/verwaltung/konto$#',                   'route_admin_create'],
     ['POST', '#^/verwaltung/konto/(\d+)$#',             'route_admin_rename'],
+    ['POST', '#^/verwaltung/konto/(\d+)/status$#',      'route_admin_status'],
     ['POST', '#^/verwaltung/konto/(\d+)/loeschen$#',    'route_admin_delete'],
 ];
 
