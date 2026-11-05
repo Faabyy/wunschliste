@@ -188,3 +188,7 @@ python3 tests/smoke.py            # startet php -S selbst, nutzt einen leeren Da
 python3 tests/smoke.py webspace   # dasselbe als Webspace-Fall: Unterordner, config.php
 php tests/price_test.php    # Preiserkennung und SSRF-Sperre, ohne Netz
 ```
+
+---
+
+Co-Authored-By: Claude
