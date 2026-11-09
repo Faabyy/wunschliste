@@ -40,6 +40,11 @@ kein Build-Schritt, keine externen Schriften oder CDNs.
   sehen so keine Besucher.
 - **Geheime Reservierung**: Andere sehen „Anna schenkt das“, der Besitzer sieht nichts. Nur wer
   reserviert hat, kann die Reservierung aufheben.
+- **Wer sieht meine Liste?** Jede beschenkte Person legt selbst fest, ob alle ihre Liste sehen oder
+  nur ausgewählte Konten (Link „ändern“ unter der eigenen Liste). Für alle anderen gibt es die
+  Liste dann nicht: nicht in der Übersicht, nicht über die Adresse, kein Reservieren. Wer vorher
+  schon etwas zugesagt hat, behält die Zusage unter „Was ich schenke“ und kann sie abhaken oder
+  aufheben. Neue Konten sehen eine eingeschränkte Liste erst, wenn sie ausgewählt werden.
 - **Hinweise an Schenkende**: Löscht der Besitzer einen reservierten Wunsch, bekommt der Schenkende
   beim nächsten Besuch „Ein von dir reservierter Wunsch von X wurde entfernt: …“. Ändert er Titel,
   Link oder Notiz, gibt es ebenfalls einen dezenten Hinweis.
@@ -60,6 +65,8 @@ Das ist serverseitig abgesichert, nicht nur in der Anzeige:
 - Bearbeiten, Löschen, Reservieren- oder Freigeben-Versuche des Besitzers liefern immer dieselbe
   Antwort, egal ob reserviert ist.
 - Die Verwaltung zeigt nur Namen und Anzahl der Wünsche, keine Reservierungen.
+- Die Einstellung „Wer sieht meine Liste?“ liest und ändert keine Reservierungen. Der Besitzer
+  erfährt dort also nicht, ob jemand, den er herausnimmt, schon etwas zugesagt hat.
 - `tests/smoke.py` prüft das: Die Seiten des Besitzers müssen vor und nach einer Reservierung
   **byte-gleich** sein.
 

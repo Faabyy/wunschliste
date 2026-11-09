@@ -37,7 +37,7 @@ foreach ($groups as $g) {
 
     <?php foreach ($groups as $ownerId => $g): ?>
       <section class="gift-group">
-        <h2 class="group-title"><?= avatar($g['name'], 'avatar-sm') ?><a href="<?= e(base_path()) ?>/liste/<?= (int) $ownerId ?>"><?= e($g['name']) ?></a></h2>
+        <h2 class="group-title"><?= avatar($g['name'], 'avatar-sm') ?><?php if ($g['visible']): ?><a href="<?= e(base_path()) ?>/liste/<?= (int) $ownerId ?>"><?= e($g['name']) ?></a><?php else: ?><span><?= e($g['name']) ?></span><?php endif; ?></h2>
         <ol class="cards">
           <?php foreach ($g['items'] as $it): $id = (int) $it['id']; $isBought = (bool) $it['purchased']; ?>
             <li class="card card-gift<?= $isBought ? ' is-bought' : '' ?>" id="e<?= $id ?>" data-id="<?= $id ?>">

@@ -60,7 +60,7 @@
           <?= Csrf::field() ?>
           <?php if ($a['can_wish']): ?>
             <span class="status-badge status-wish"><?= icon('gift') ?>Beschenkt</span>
-            <span class="account-meta"><?= e(count_label((int) $a['items'], 'Wunsch', 'Wünsche')) ?></span>
+            <span class="account-meta"><?= e(count_label((int) $a['items'], 'Wunsch', 'Wünsche')) ?><?= $a['restricted'] ? ', sichtbar für ' . e((int) $a['viewers'] === 0 ? 'niemanden' : count_label((int) $a['viewers'], 'Person', 'Personen')) : '' ?></span>
             <input type="hidden" name="status" value="schenker">
             <button type="submit" class="btn-text">auf „schenkt nur“ setzen</button>
           <?php else: ?>

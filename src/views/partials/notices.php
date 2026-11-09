@@ -8,8 +8,9 @@
           Ein von dir reservierter Wunsch von <?= e($n['owner_name']) ?> wurde entfernt: <strong><?= e($n['item_title']) ?></strong>
         <?php else: ?>
           <?= e($n['owner_name']) ?> hat einen Wunsch geändert, den du schenken willst:
-          <?php if ($n['item_id'] !== null && $n['owner_id'] !== null): ?>
-            <a href="<?= e(base_path()) ?>/liste/<?= (int) $n['owner_id'] ?>#e<?= (int) $n['item_id'] ?>"><strong><?= e($n['item_title']) ?></strong></a>.
+          <?php if ($n['item_id'] !== null): ?>
+            <?php // Ziel ist „Was ich schenke“: Das geht auch, wenn die Liste für mich nicht mehr freigegeben ist. ?>
+            <a href="<?= e(base_path()) ?>/schenken#e<?= (int) $n['item_id'] ?>"><strong><?= e($n['item_title']) ?></strong></a>.
           <?php else: ?>
             <strong><?= e($n['item_title']) ?></strong>.
           <?php endif; ?>

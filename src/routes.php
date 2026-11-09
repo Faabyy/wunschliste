@@ -151,6 +151,7 @@ function route_home(): void
     }
     page('home', [
         'user' => $user,
+        'visibility' => visibility_label($user, Wishlist::viewerChoices($uid)),
         'items' => Wishlist::ownItems($uid),
         'people' => Wishlist::others($uid),
         'notices' => Wishlist::notices($uid),
@@ -233,7 +234,8 @@ function route_list(string $id): void
         redirect('/');
     }
     $owner = Wishlist::userById($ownerId);
-    if ($owner === null || !$owner['can_wish']) {
+    // Nicht freigegebene Listen sehen aus wie nicht vorhandene.
+    if ($owner === null || !Wishlist::canSee($ownerId, (int) $user['id'])) {
         abort(404, 'Diese Liste gibt es nicht.');
     }
     show_list($owner, $user, false);
@@ -363,6 +365,47 @@ function route_item_move(string $id, string $direction): void
     $user = require_wisher();
     attempt(fn() => Wishlist::move((int) $user['id'], (int) $id, $direction === 'hoch' ? -1 : 1));
     redirect('/#e' . (int) $id);
+}
+
+// ---------- Sichtbarkeit der eigenen Liste ----------
+
+/** Kurztext für die Startseite, ohne Namen. Leer, wenn es keine anderen Konten gibt. */
+function visibility_label(array $user, array $choices): string
+{
+    if ($choices === []) {
+        return '';
+    }
+    if (!$user['restricted']) {
+        return 'Sichtbar für alle';
+    }
+    $allowed = count(array_filter($choices, static fn(array $c): bool => (bool) $c['allowed']));
+    return $allowed === 0 ? 'Für niemanden sichtbar' : 'Sichtbar für ' . count_label($allowed, 'Person', 'Personen');
+}
+
+function route_visibility(): void
+{
+    $user = require_wisher();
+    page('visibility', [
+        'restricted' => (bool) $user['restricted'],
+        'choices' => Wishlist::viewerChoices((int) $user['id']),
+    ], 'Wer sieht meine Liste?', 'home');
+}
+
+function route_visibility_save(): void
+{
+    $user = require_wisher();
+    $restricted = ($_POST['sichtbar'] ?? '') === 'auswahl';
+    $ids = is_array($_POST['personen'] ?? null) ? $_POST['personen'] : [];
+    $ids = array_values(array_unique(array_map('intval', array_filter($ids, 'is_scalar'))));
+    Wishlist::setVisibility((int) $user['id'], $restricted, $ids);
+    $user['restricted'] = $restricted ? 1 : 0;
+    $label = visibility_label($user, Wishlist::viewerChoices((int) $user['id']));
+    flash('success', match (true) {
+        !$restricted => 'Gespeichert. Alle können deine Liste sehen.',
+        $label === 'Für niemanden sichtbar' => 'Gespeichert. Deine Liste sieht jetzt niemand außer dir.',
+        default => 'Gespeichert. ' . $label . '.',
+    });
+    redirect('/');
 }
 
 // ---------- Reservieren ----------

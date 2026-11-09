@@ -1,5 +1,5 @@
 <?php
-/** @var string $content @var string $title @var string $active @var ?array $user @var int $otherLists @var array $flashes */
+/** @var string $content @var string $title @var string $active @var ?array $user @var int $otherLists @var bool $hasGifts @var array $flashes */
 $current = static fn(string $key): string => $active === $key ? ' aria-current="page"' : '';
 
 // Menüpunkte: [Ziel, aktiv-Schlüssel, Text oben, Text Tableiste, Icon]. Nur, was es gerade gibt.
@@ -15,7 +15,7 @@ if ($user) {
     } else {
         $nav[] = ['/', 'people', 'Wunschlisten', 'Wunschlisten', 'users'];
     }
-    if ($otherLists > 0) {
+    if ($otherLists > 0 || $hasGifts) {
         $nav[] = ['/schenken', 'gifts', 'Was ich schenke', 'Ich schenke', 'gift'];
     }
 }

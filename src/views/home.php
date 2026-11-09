@@ -1,10 +1,13 @@
-<?php /** @var array $user @var array $items @var array $people @var array $notices @var array $old */ ?>
+<?php /** @var array $user @var string $visibility @var array $items @var array $people @var array $notices @var array $old */ ?>
 <?= view('partials/notices', ['notices' => $notices, 'back' => '/']) ?>
 <div class="home-grid<?= $people ? '' : ' home-single' ?>">
   <section class="col-own" aria-labelledby="h-own">
     <header class="section-head">
       <h1 id="h-own">Meine Wunschliste</h1>
       <p class="sub"><?= count($items) ? e(count_label(count($items), 'Wunsch', 'Wünsche')) : 'Noch leer' ?></p>
+      <?php if ($visibility !== ''): ?>
+        <p class="visibility"><?= icon($user['restricted'] ? 'eye-off' : 'eye') ?><span><?= e($visibility) ?></span><a href="<?= e(url('/sichtbarkeit')) ?>">ändern</a></p>
+      <?php endif; ?>
     </header>
 
     <details class="adder" id="neu"<?= !$items || !empty($old['open']) ? ' open' : '' ?>>

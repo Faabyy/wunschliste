@@ -85,7 +85,7 @@ class Browser:
     def post(self, path, data, token=None, follow=True):
         if token is None:
             token = self.csrf(self.get("/")[1])
-        body = urllib.parse.urlencode({**data, "_csrf": token}).encode()
+        body = urllib.parse.urlencode({**data, "_csrf": token}, doseq=True).encode()
         opener = self.opener if follow else self.raw
         try:
             with opener.open(urllib.request.Request(self.base + path, data=body)) as r:
@@ -135,6 +135,7 @@ def main():
             run_webspace(base)
         else:
             run_single(env)
+            run_visibility(env)
     finally:
         server.terminate()
         err = server.stderr.read().decode()
@@ -188,6 +189,99 @@ def run_single(env):
               "Mit zwei Beschenkten wieder die Übersicht für Schenkende")
     finally:
         server.terminate()
+
+
+def run_visibility(env):
+    """Der Besitzer legt fest, wer seine Liste sehen darf."""
+    print("Sichtbarkeit der eigenen Liste")
+    env = dict(env, WUNSCHLISTE_DATA=tempfile.mkdtemp(prefix="wunschliste-sicht-"))
+    port = free_port()
+    server = subprocess.Popen(["php", "-S", f"127.0.0.1:{port}", "-t", os.path.join(ROOT, "public")],
+                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    try:
+        time.sleep(0.6)
+        base = f"http://127.0.0.1:{port}"
+        for name, status in (("Lena", "beschenkt"), ("Max", "beschenkt"), ("Oma", "schenker"), ("Opa", "schenker")):
+            konten(env, "anlegen", name, status)
+        ids = {m.group(2): int(m.group(1)) for m in re.finditer(r"^\s*(\d+)\s+(\S+)", konten(env, "liste").stdout, re.M)}
+        lena, max_, oma, opa = (login(base, n) for n in ("Lena", "Max", "Oma", "Opa"))
+        lena.post("/eintrag", {"titel": "Puppenhaus", "link": "", "notiz": "", "preis": ""})
+        lena.post("/eintrag", {"titel": "Roller", "link": "", "notiz": "", "preis": ""})
+        max_.post("/eintrag", {"titel": "Fußball", "link": "", "notiz": "", "preis": ""})
+        house, roller = (int(x) for x in re.findall(r'<li class="card card-own" id="e(\d+)"', lena.get("/")[1]))
+        lid = ids["Lena"]
+        back = {"zurueck": f"/liste/{lid}"}
+
+        s, html, _ = lena.get("/")
+        check("Sichtbar für alle" in html and "/sichtbarkeit" in html, "Startseite zeigt „Sichtbar für alle“ mit Link")
+        s, html, _ = lena.get("/sichtbarkeit")
+        check(s == 200 and all(n in html for n in ("Max", "Oma", "Opa")) and 'value="alle" checked' in html,
+              "Einstellungsseite listet alle anderen Konten, Vorgabe „Alle“")
+        check("keine eigene Wunschliste" in oma.get("/sichtbarkeit")[1], "Schenkende haben keine Einstellungsseite")
+
+        opa.post(f"/eintrag/{house}/reservieren", back)
+        check("Puppenhaus" in opa.get("/schenken")[1], "Opa reserviert das Puppenhaus")
+        before = lena.get("/sichtbarkeit")[1]
+
+        s, html, _ = lena.post("/sichtbarkeit", {"sichtbar": "auswahl", "personen[]": [str(ids["Oma"]), str(lid), "999", "x"]})
+        check("Sichtbar für 1\u00a0Person" in html, "Nur Oma ausgewählt (eigene und unbekannte IDs ignoriert)")
+        check("Opa" not in html.split("<main")[1], "Antwort an Lena nennt Opa nicht")
+        check(oma.get(f"/liste/{lid}")[0] == 200 and "Roller" in oma.get(f"/liste/{lid}")[1], "Oma kann Lenas Liste öffnen")
+        check(f'/liste/{lid}"' not in max_.get("/")[1] and f'/liste/{lid}"' not in max_.get("/listen")[1],
+              "Max sieht Lenas Liste nicht in der Übersicht")
+        s, html, _ = max_.get(f"/liste/{lid}")
+        check(s == 404 and "Roller" not in html, "Max bekommt für Lenas Liste 404")
+        s, html, _ = max_.post(f"/eintrag/{roller}/reservieren", back)
+        check("gibt es nicht mehr" in html, "Max kann auf der gesperrten Liste nichts reservieren")
+        check("Roller" not in max_.get("/schenken")[1], "Keine Reservierung für Max entstanden")
+        s, html, _ = opa.get("/")
+        check("Wünsche von Max" in html and "Lena" not in html.split("<main")[1], "Opa sieht nur noch Max (einzige Liste)")
+        check(opa.get(f"/liste/{lid}")[0] == 404, "Opa bekommt für Lenas Liste 404")
+        s, html, _ = opa.get("/schenken")
+        check("Puppenhaus" in html and f"/liste/{lid}" not in html, "Opas Zusage bleibt unter „Was ich schenke“, ohne Link zur Liste")
+        opa.post(f"/eintrag/{house}/gekauft", {})
+        check('aria-pressed="true"' in opa.get("/schenken")[1], "Opa kann seine Zusage weiter abhaken")
+        check("Opa schenkt das" in oma.get(f"/liste/{lid}")[1], "Oma sieht Opas Reservierung weiter")
+        lena.post(f"/eintrag/{house}", {"titel": "Puppenhaus groß", "link": "", "notiz": "", "preis": ""})
+        s, html, _ = opa.get("/schenken")
+        check("Puppenhaus groß" in html and f'/schenken#e{house}"' in html and f"/liste/{lid}" not in html,
+              "Opa bekommt den Änderungshinweis, der Link führt zu „Was ich schenke“")
+        s, html, _ = opa.post(f"/eintrag/{house}/freigeben", {"zurueck": "/schenken"})
+        check("Puppenhaus" not in opa.get("/schenken")[1], "Opa kann seine Zusage aufheben")
+        check("Was ich schenke" in opa.get("/")[1], "Menü bleibt für Opa erhalten (Max ist sichtbar)")
+        s, html, _ = opa.post(f"/eintrag/{house}/reservieren", back)
+        check("gibt es nicht mehr" in html, "Danach kann Opa dort nicht erneut reservieren")
+
+        s, html, _ = lena.get("/sichtbarkeit")
+        check('value="auswahl" checked' in html and re.search(rf'value="{ids["Oma"]}" checked', html) is not None
+              and re.search(rf'value="{ids["Opa"]}" checked', html) is None, "Einstellungsseite zeigt die gespeicherte Auswahl")
+        check("reserv" not in html.lower() and "reserv" not in before.lower(), "Einstellungsseite verrät keine Reservierungen")
+
+        konten(env, "anlegen", "Tante")
+        tante = login(base, "Tante")
+        check(tante.get(f"/liste/{lid}")[0] == 404, "Neues Konto sieht eine eingeschränkte Liste nicht")
+
+        s, html, _ = lena.post("/sichtbarkeit", {"sichtbar": "auswahl"})
+        check("Für niemanden sichtbar" in html, "Auswahl ohne Personen: niemand sieht die Liste")
+        check(oma.get(f"/liste/{lid}")[0] == 404, "Auch Oma sieht sie dann nicht")
+        check("Meine Wunschliste" in lena.get("/")[1] and "Roller" in lena.get("/")[1], "Lena selbst sieht ihre Liste weiter")
+
+        admin = Browser(base)
+        s, html, _ = admin.get("/verwaltung")
+        admin.post("/verwaltung/anmelden", {"passwort": ADMIN}, token=admin.csrf(html))
+        check("sichtbar für niemanden" in admin.get("/verwaltung")[1], "Verwaltung zeigt die Einschränkung")
+
+        s, html, _ = lena.post("/sichtbarkeit", {"sichtbar": "alle", "personen[]": [str(ids["Oma"])]})
+        check("Sichtbar für alle" in html, "Zurück auf „Alle“")
+        check(all(b.get(f"/liste/{lid}")[0] == 200 for b in (max_, oma, opa, tante)), "Alle sehen Lenas Liste wieder")
+        check(re.search(rf'value="{ids["Oma"]}" checked', lena.get("/sichtbarkeit")[1]) is not None, "Auswahl bleibt für später gemerkt")
+        s, html, _ = max_.post(f"/eintrag/{roller}/reservieren", back)
+        check("Du schenkst das" in html, "Max kann jetzt reservieren")
+    finally:
+        server.terminate()
+        err = server.stderr.read().decode()
+        bad = [l for l in err.splitlines() if "PHP " in l and ("Warning" in l or "Error" in l or "Notice" in l or "Deprecated" in l)]
+        check(not bad, "Keine PHP-Meldungen im Serverlog" + ("\n" + "\n".join(bad) if bad else ""))
 
 
 def run_webspace(base):

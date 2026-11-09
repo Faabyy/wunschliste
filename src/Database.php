@@ -102,6 +102,14 @@ final class Database
             // Bild zum Wunsch (Dateiname in data/bilder/); image_manual = hochgeladen oder bewusst entfernt.
             3 => 'ALTER TABLE items ADD COLUMN image TEXT;
                   ALTER TABLE items ADD COLUMN image_manual INTEGER NOT NULL DEFAULT 0;',
+            // Sichtbarkeit der eigenen Liste: restricted = 0 alle, 1 nur die Konten in list_viewers.
+            4 => 'ALTER TABLE users ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0;
+                  CREATE TABLE list_viewers (
+                      owner_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                      viewer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                      PRIMARY KEY (owner_id, viewer_id)
+                  ) WITHOUT ROWID;
+                  CREATE INDEX list_viewers_viewer ON list_viewers(viewer_id);',
         ];
     }
 

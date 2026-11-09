@@ -9,6 +9,9 @@ declare(strict_types=1);
  */
 final class Wishlist
 {
+    /** Bedingung: Konto u zeigt seine Liste dem Betrachter (ein Platzhalter für dessen ID). */
+    private const VISIBLE_TO = '(u.restricted = 0 OR EXISTS (SELECT 1 FROM list_viewers v WHERE v.owner_id = u.id AND v.viewer_id = ?))';
+
     private const ITEM_COLUMNS = 'i.id, i.user_id, i.title, i.url, i.note, i.price_cents, i.price_currency, i.price_manual, i.image, i.image_manual, i.position';
 
     private static function db(): PDO
@@ -35,16 +38,16 @@ final class Wishlist
 
     public static function userById(int $id): ?array
     {
-        return self::one('SELECT id, name, can_wish FROM users WHERE id = ?', [$id]);
+        return self::one('SELECT id, name, can_wish, restricted FROM users WHERE id = ?', [$id]);
     }
 
     public static function userByName(string $name): ?array
     {
         $key = name_key($name);
-        return $key === '' ? null : self::one('SELECT id, name, can_wish FROM users WHERE name_key = ?', [$key]);
+        return $key === '' ? null : self::one('SELECT id, name, can_wish, restricted FROM users WHERE name_key = ?', [$key]);
     }
 
-    /** Alle anderen Beschenkten mit Anzahl Wünsche und davon noch freien. */
+    /** Alle anderen Beschenkten, deren Liste der Betrachter sehen darf, mit Anzahl Wünsche und davon noch freien. */
     public static function others(int $viewerId): array
     {
         return self::all(
@@ -52,11 +55,53 @@ final class Wishlist
                FROM users u
                LEFT JOIN items i ON i.user_id = u.id
                LEFT JOIN reservations r ON r.item_id = i.id
-              WHERE u.id <> ? AND u.can_wish = 1
+              WHERE u.id <> ? AND u.can_wish = 1 AND ' . self::VISIBLE_TO . '
               GROUP BY u.id
               ORDER BY u.name_key',
-            [$viewerId]
+            [$viewerId, $viewerId]
         );
+    }
+
+    // ---------- Sichtbarkeit der eigenen Liste ----------
+
+    /** Darf der Betrachter die Liste dieses Kontos sehen? */
+    public static function canSee(int $ownerId, int $viewerId): bool
+    {
+        return self::one(
+            'SELECT 1 FROM users u WHERE u.id = ? AND u.can_wish = 1 AND ' . self::VISIBLE_TO,
+            [$ownerId, $viewerId]
+        ) !== null;
+    }
+
+    /** Alle anderen Konten, mit allowed = 1, wenn sie in der Auswahl des Besitzers stehen. */
+    public static function viewerChoices(int $ownerId): array
+    {
+        return self::all(
+            'SELECT u.id, u.name, v.viewer_id IS NOT NULL AS allowed
+               FROM users u
+               LEFT JOIN list_viewers v ON v.owner_id = ? AND v.viewer_id = u.id
+              WHERE u.id <> ?
+              ORDER BY u.name_key',
+            [$ownerId, $ownerId]
+        );
+    }
+
+    /**
+     * Legt fest, wer die eigene Liste sieht: alle oder nur die genannten Konten. Die Auswahl bleibt
+     * auch bei „alle“ gespeichert. Reservierungen werden hier weder gelesen noch geändert.
+     */
+    public static function setVisibility(int $ownerId, bool $restricted, array $viewerIds): void
+    {
+        Database::tx(function (PDO $db) use ($ownerId, $restricted, $viewerIds): void {
+            $db->prepare('UPDATE users SET restricted = ? WHERE id = ?')->execute([$restricted ? 1 : 0, $ownerId]);
+            $db->prepare('DELETE FROM list_viewers WHERE owner_id = ?')->execute([$ownerId]);
+            $insert = $db->prepare(
+                'INSERT OR IGNORE INTO list_viewers (owner_id, viewer_id) SELECT ?, id FROM users WHERE id = ? AND id <> ?'
+            );
+            foreach ($viewerIds as $viewerId) {
+                $insert->execute([$ownerId, $viewerId, $ownerId]);
+            }
+        });
     }
 
     // ---------- Eigene Liste (ohne Reservierungsdaten) ----------
@@ -217,7 +262,7 @@ final class Wishlist
 
     public static function reserve(int $viewerId, int $itemId): void
     {
-        self::assertForeign($viewerId, $itemId);
+        self::assertForeign($viewerId, $itemId, true);
         try {
             self::db()->prepare('INSERT INTO reservations (item_id, user_id) VALUES (?, ?)')->execute([$itemId, $viewerId]);
         } catch (PDOException $e) {
@@ -252,8 +297,11 @@ final class Wishlist
     /**
      * Prüft zuerst und ohne Blick auf Reservierungen, ob es der eigene Wunsch ist. So bekommt der
      * Besitzer immer dieselbe Antwort, egal ob jemand reserviert hat.
+     *
+     * $mustSee: Die Liste muss für den Betrachter sichtbar sein (neu reservieren). Bestehende
+     * Reservierungen lassen sich auch danach noch aufheben und abhaken.
      */
-    private static function assertForeign(int $viewerId, int $itemId): void
+    private static function assertForeign(int $viewerId, int $itemId, bool $mustSee = false): void
     {
         $owner = self::one('SELECT i.user_id FROM items i JOIN users u ON u.id = i.user_id WHERE i.id = ? AND u.can_wish = 1', [$itemId]);
         if ($owner === null) {
@@ -262,23 +310,30 @@ final class Wishlist
         if ((int) $owner['user_id'] === $viewerId) {
             throw new UserError('Das ist dein eigener Wunsch.');
         }
+        if ($mustSee && !self::canSee((int) $owner['user_id'], $viewerId)) {
+            throw new UserError('Diesen Wunsch gibt es nicht mehr.');
+        }
     }
 
-    /** Was ich verschenke, gruppiert nach Person. */
+    /**
+     * Was ich verschenke, gruppiert nach Person. Zusagen bleiben, auch wenn die Person ihre Liste
+     * inzwischen nicht mehr für mich freigibt (visible = 0).
+     */
     public static function gifts(int $viewerId): array
     {
         $rows = self::all(
-            'SELECT ' . self::ITEM_COLUMNS . ', u.name AS owner_name, r.purchased
+            'SELECT ' . self::ITEM_COLUMNS . ', u.name AS owner_name, r.purchased, ' . self::VISIBLE_TO . ' AS owner_visible
                FROM reservations r
                JOIN items i ON i.id = r.item_id
                JOIN users u ON u.id = i.user_id
               WHERE r.user_id = ? AND u.can_wish = 1
               ORDER BY u.name_key, i.position, i.id',
-            [$viewerId]
+            [$viewerId, $viewerId]
         );
         $groups = [];
         foreach ($rows as $row) {
             $groups[(int) $row['user_id']]['name'] = $row['owner_name'];
+            $groups[(int) $row['user_id']]['visible'] = (bool) $row['owner_visible'];
             $groups[(int) $row['user_id']]['items'][] = $row;
         }
         return $groups;
@@ -301,7 +356,8 @@ final class Wishlist
     public static function accounts(): array
     {
         return self::all(
-            'SELECT u.id, u.name, u.can_wish, u.created_at, COUNT(i.id) AS items
+            'SELECT u.id, u.name, u.can_wish, u.restricted, u.created_at, COUNT(i.id) AS items,
+                    (SELECT COUNT(*) FROM list_viewers v WHERE v.owner_id = u.id) AS viewers
                FROM users u LEFT JOIN items i ON i.user_id = u.id
               GROUP BY u.id ORDER BY u.name_key'
         );
@@ -331,7 +387,7 @@ final class Wishlist
             }
             throw $e;
         }
-        return ['id' => (int) self::db()->lastInsertId(), 'name' => $name, 'can_wish' => $canWish ? 1 : 0];
+        return ['id' => (int) self::db()->lastInsertId(), 'name' => $name, 'can_wish' => $canWish ? 1 : 0, 'restricted' => 0];
     }
 
     public static function renameUser(int $id, mixed $raw): void

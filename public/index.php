@@ -37,6 +37,8 @@ $routes = [
     ['GET',  '#^/listen$#',                             'route_people'],
     ['GET',  '#^/liste/(\d+)$#',                        'route_list'],
     ['GET',  '#^/schenken$#',                           'route_gifts'],
+    ['GET',  '#^/sichtbarkeit$#',                       'route_visibility'],
+    ['POST', '#^/sichtbarkeit$#',                       'route_visibility_save'],
     ['POST', '#^/eintrag$#',                            'route_item_create'],
     ['GET',  '#^/eintrag/(\d+)$#',                      'route_item_edit'],
     ['POST', '#^/eintrag/(\d+)$#',                      'route_item_update'],

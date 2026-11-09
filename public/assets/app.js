@@ -103,6 +103,14 @@
       old.replaceWith(fresh);
       fadeFlashes();
 
+  // Sichtbarkeit: Wer eine Person anhakt, meint „nur ausgewählte Personen“.
+  document.querySelectorAll('input[data-pick]').forEach((box) => {
+    box.addEventListener('change', () => {
+      const radio = box.form && box.form.querySelector('[data-pick-radio]');
+      if (radio && box.checked) radio.checked = true;
+    });
+  });
+
   // Bild-Upload: im Browser auf 1200 px verkleinern und als JPEG neu zeichnen. Das spart Datenvolumen
   // und entfernt Metadaten wie den GPS-Standort von Handyfotos. Ohne JS prüft und bereinigt der Server.
   document.querySelectorAll('input[type="file"][data-resize]').forEach((input) => {
@@ -169,6 +177,14 @@
   }
 
   fadeFlashes();
+
+  // Sichtbarkeit: Wer eine Person anhakt, meint „nur ausgewählte Personen“.
+  document.querySelectorAll('input[data-pick]').forEach((box) => {
+    box.addEventListener('change', () => {
+      const radio = box.form && box.form.querySelector('[data-pick-radio]');
+      if (radio && box.checked) radio.checked = true;
+    });
+  });
 
   // Bild-Upload: im Browser auf 1200 px verkleinern und als JPEG neu zeichnen. Das spart Datenvolumen
   // und entfernt Metadaten wie den GPS-Standort von Handyfotos. Ohne JS prüft und bereinigt der Server.

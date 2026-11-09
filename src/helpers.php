@@ -119,6 +119,7 @@ function page(string $name, array $vars, string $title, string $active = ''): ne
         'active' => $active,
         'user' => $user,
         'otherLists' => $user === null ? 0 : count(Wishlist::others((int) $user['id'])),
+        'hasGifts' => $user !== null && Wishlist::gifts((int) $user['id']) !== [],
         'flashes' => take_flashes(),
     ]);
     exit;
